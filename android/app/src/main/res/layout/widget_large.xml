@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="Waiting lists"
+                android:textColor="@color/panel_foreground"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="VATSIM UK"
+                android:textColor="@color/panel_muted"
+                android:textSize="11.5sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/badge_ok"
+            android:layout_width="wrap_content"
+            android:layout_height="22dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/badge_success"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="Up to date"
+            android:textColor="@color/success_foreground"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/badge_checking"
+            android:layout_width="wrap_content"
+            android:layout_height="22dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/badge_info"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="Checking"
+            android:textColor="@color/info_foreground"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/badge_sign_in"
+            android:layout_width="wrap_content"
+            android:layout_height="22dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/badge_warning"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="Sign in"
+            android:textColor="@color/warning_foreground"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/badge_error"
+            android:layout_width="wrap_content"
+            android:layout_height="22dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/badge_destructive"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="Error"
+            android:textColor="@color/destructive_foreground"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/refresh"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginStart="4dp"
+            android:contentDescription="Check now"
+            android:padding="7dp"
+            android:src="@drawable/ic_refresh" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/alert"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/alert_warning"
+        android:padding="10dp"
+        android:textColor="@color/panel_foreground"
+        android:textSize="12.5sp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/rows"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:divider="@drawable/divider"
+        android:orientation="vertical"
+        android:showDividers="middle" />
+
+    <TextView
+        android:id="@+id/empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="4dp"
+        android:paddingTop="8dp"
+        android:text="Open the app to sign in."
+        android:textColor="@color/panel_muted"
+        android:textSize="12.5sp" />
+</LinearLayout>

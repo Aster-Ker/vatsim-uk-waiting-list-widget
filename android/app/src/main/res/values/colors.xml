@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PanelUI "Panel" theme tokens (https://panelui.dev), light. Tints are pre-blended onto the card. -->
+<resources>
+    <color name="panel_background">#FFFFFF</color>
+    <color name="panel_card">#FFFFFF</color>
+    <color name="panel_foreground">#262626</color>
+    <color name="panel_muted">#686868</color>
+    <color name="panel_border">#EBEBEB</color>
+    <color name="panel_secondary">#F0F0F0</color>
+    <color name="success_foreground">#047857</color>
+    <color name="success_solid">#10B981</color>
+    <color name="success_tint">#ECF9F5</color>
+    <color name="warning_foreground">#B45309</color>
+    <color name="warning_tint">#FEF7EB</color>
+    <color name="destructive_foreground">#B91C1C</color>
+    <color name="destructive_solid">#EF4444</color>
+    <color name="destructive_tint">#FEF0F0</color>
+    <color name="info_foreground">#1D4ED8</color>
+    <color name="info_tint">#EFF5FE</color>
+    <color name="icon_background">#262626</color>
+    <color name="icon_foreground">#FAFAFA</color>
+</resources>

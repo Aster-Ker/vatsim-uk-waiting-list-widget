@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PanelUI "Panel" theme tokens, dark. -->
+<resources>
+    <color name="panel_background">#141414</color>
+    <color name="panel_card">#191919</color>
+    <color name="panel_foreground">#F5F5F5</color>
+    <color name="panel_muted">#878787</color>
+    <color name="panel_border">#2B2B2B</color>
+    <color name="panel_secondary">#2B2B2B</color>
+    <color name="success_foreground">#34D399</color>
+    <color name="success_solid">#10B981</color>
+    <color name="success_tint">#182F28</color>
+    <color name="warning_foreground">#FBBF24</color>
+    <color name="warning_tint">#382C17</color>
+    <color name="destructive_foreground">#F87171</color>
+    <color name="destructive_solid">#F15757</color>
+    <color name="destructive_tint">#372222</color>
+    <color name="info_foreground">#60A5FA</color>
+    <color name="info_tint">#1E2838</color>
+</resources>

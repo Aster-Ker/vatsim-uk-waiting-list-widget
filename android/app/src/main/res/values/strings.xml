@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UK Waiting Lists</string>
+    <string name="widget_name">Waiting lists</string>
+    <string name="widget_description">Your VATSIM UK waiting list positions</string>
+</resources>
