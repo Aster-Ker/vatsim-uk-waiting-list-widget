@@ -1,6 +1,6 @@
 # VATSIM UK Waiting List Widget
 
-> **Android:** there's also an Android app with a home screen widget in [`android/`](android/README.md).
+> **Downloads:** get the latest [Android app (APK)](https://github.com/Aster-Ker/vatsim-uk-waiting-list-widget/releases/latest/download/UKWaitingLists.apk) or [Windows widget (zip)](https://github.com/Aster-Ker/vatsim-uk-waiting-list-widget/releases/latest/download/WaitingListWidget-win-x64.zip), or see all [releases](https://github.com/Aster-Ker/vatsim-uk-waiting-list-widget/releases). The Android app is described in [`android/README.md`](android/README.md).
 
 A small always-on-top Windows desktop widget that shows your positions on the
 VATSIM UK waiting lists (https://www.vatsim.uk/mship/waiting-lists) and pops a

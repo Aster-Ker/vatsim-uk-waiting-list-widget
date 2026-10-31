@@ -1,0 +1,64 @@
+name: Release
+
+# Push a tag like v1.2.0 to build both apps and publish them as a GitHub release.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew assembleDebug --console=plain
+      - run: cp "$(find app/build/outputs -name '*.apk' | head -1)" UKWaitingLists.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: android/UKWaitingLists.apk
+
+  windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: >
+          dotnet publish VatsimUkWaitingListWidget.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
+      - run: cd publish && zip -9 ../WaitingListWidget-win-x64.zip WaitingListWidget.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: WaitingListWidget-win-x64.zip
+
+  release:
+    needs: [android, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: .github/RELEASE_NOTES.md
+          files: |
+            dist/UKWaitingLists.apk
+            dist/WaitingListWidget-win-x64.zip

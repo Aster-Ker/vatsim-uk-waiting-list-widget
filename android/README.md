@@ -5,9 +5,8 @@ notifies you when they change. It's the Android companion to the Windows widget 
 
 ## Install
 
-1. Open the repository's **Actions** tab → **Android app** → the latest green run.
-2. Under **Artifacts**, download **UKWaitingLists-apk** and unzip it to get `UKWaitingLists.apk`.
-3. Copy it to your phone and open it. Allow installing from that source when Android asks.
+1. On your phone, download [`UKWaitingLists.apk`](https://github.com/Aster-Ker/vatsim-uk-waiting-list-widget/releases/latest/download/UKWaitingLists.apk) from the latest release.
+2. Open it and allow installing from your browser or Files app when Android asks.
 
 Requires Android 8.0 or later. Each build is signed with the same key (`app/debug.keystore`),
 so a newer APK installs over the old one and keeps your sign-in and settings.
