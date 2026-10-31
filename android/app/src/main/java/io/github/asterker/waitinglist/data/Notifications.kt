@@ -8,7 +8,10 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -16,22 +19,56 @@ import io.github.asterker.waitinglist.R
 import io.github.asterker.waitinglist.ui.MainActivity
 
 object Notifications {
-    private const val CHANNEL_CHANGES = "position_changes"
+    // Android fixes a channel's sound when it's created, so the loud channels have new IDs
+    // and the original quiet "position_changes" channel is deleted.
+    private const val CHANNEL_ALARM = "position_alarm"
+    private const val CHANNEL_SOUND = "position_sound"
+    private const val OLD_CHANNEL_CHANGES = "position_changes"
     private const val CHANNEL_ACCOUNT = "account"
     private const val ID_SIGN_IN = 1
     private var nextChangeId = 100
+    private val VIBRATION = longArrayOf(0, 400, 200, 400, 200, 400)
 
     fun createChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel(OLD_CHANNEL_CHANGES)
+
+        val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val alarmAudio = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+
         manager.createNotificationChannels(
             listOf(
-                NotificationChannel(CHANNEL_CHANGES, "Position changes", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "When your position on a VATSIM UK waiting list changes"
+                NotificationChannel(CHANNEL_ALARM, "Position changes (alarm)", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Pops up with your alarm sound when a waiting list position changes, even on silent"
+                    setSound(alarmSound, alarmAudio)
+                    enableVibration(true)
+                    vibrationPattern = VIBRATION
+                    enableLights(true)
+                },
+                NotificationChannel(CHANNEL_SOUND, "Position changes", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Pops up with your notification sound when a waiting list position changes"
+                    enableVibration(true)
+                    vibrationPattern = VIBRATION
                 },
                 NotificationChannel(CHANNEL_ACCOUNT, "Sign-in reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "When you need to sign in to vatsim.uk again"
                 },
             )
+        )
+    }
+
+    // Opens Android's settings for the channel in use, to change its sound or volume.
+    fun openChannelSettings(context: Context) {
+        val channel = if (Store.state.value.alarmSound) CHANNEL_ALARM else CHANNEL_SOUND
+        context.startActivity(
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, channel)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }
 
@@ -45,8 +82,11 @@ object Notifications {
             changes.size == 1 -> "Waiting list update"
             else -> "${changes.size} waiting list updates"
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL_CHANGES)
+        val alarm = Store.state.value.alarmSound
+        val builder = NotificationCompat.Builder(context, if (alarm) CHANNEL_ALARM else CHANNEL_SOUND)
             .setSmallIcon(R.drawable.ic_notification)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(if (alarm) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_STATUS)
             .setContentTitle(title)
             .setContentText(changes.first())
             .setStyle(NotificationCompat.BigTextStyle().bigText(changes.joinToString("\n")))

@@ -24,6 +24,7 @@ so a newer APK installs over the old one and keeps your sign-in and settings.
 
 - Lists every ATC and pilot waiting list you're on: position, ▲/▼ for the last change, join date and theory exam status
 - Notifies you when a position moves, you're added to or removed from a list, a theory exam passes, or you need to sign in again
+- Position alerts pop up, vibrate and ring with your alarm sound, even on silent. Turn off **Alarm sound** in the app to use your normal notification sound instead; **Sound settings** opens Android's settings for that alert.
 - Highlights lists that moved in the last 24 hours
 - Checks in the background every 15 minutes to 6 hours (default 1 hour)
 - Widget: small sizes show your best position; larger sizes list your waiting lists, with a refresh button

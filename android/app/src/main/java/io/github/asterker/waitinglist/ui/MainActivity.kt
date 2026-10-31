@@ -86,6 +86,8 @@ private fun App() {
             Store.update { it.copy(notify = enabled) }
             if (enabled) requestNotificationPermission()
         },
+        onAlarmSoundChange = { enabled -> Store.update { it.copy(alarmSound = enabled) } },
+        onSoundSettings = { Notifications.openChannelSettings(context) },
         onIntervalChange = { minutes ->
             Store.update { it.copy(intervalMinutes = minutes) }
             Scheduler.schedule(context, minutes, replace = true)

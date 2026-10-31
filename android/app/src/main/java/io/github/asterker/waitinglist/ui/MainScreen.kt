@@ -44,6 +44,8 @@ fun MainScreen(
     onSignIn: () -> Unit,
     onOpenWebsite: () -> Unit,
     onNotifyChange: (Boolean) -> Unit,
+    onAlarmSoundChange: (Boolean) -> Unit,
+    onSoundSettings: () -> Unit,
     onIntervalChange: (Int) -> Unit,
     onTestNotification: () -> Unit,
     onPinWidget: () -> Unit,
@@ -116,21 +118,25 @@ fun MainScreen(
                     Text("Position changes", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     Text("Notify me when a waiting list position moves", color = c.muted, fontSize = 12.5.sp)
                 }
-                Switch(
-                    checked = state.notify,
-                    onCheckedChange = onNotifyChange,
-                    colors = SwitchDefaults.colors(
-                        checkedTrackColor = c.primary,
-                        checkedThumbColor = c.primaryForeground,
-                        uncheckedTrackColor = c.secondary,
-                        uncheckedBorderColor = c.border,
-                        uncheckedThumbColor = c.muted,
-                    ),
-                )
+                PanelSwitch(state.notify, onNotifyChange)
             }
             Divider()
-            Box(Modifier.padding(12.dp)) {
-                PanelButton("Send a test notification", onTestNotification, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Alarm sound", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        if (state.alarmSound) "Rings with your alarm sound and vibrates, even on silent"
+                        else "Uses your normal notification sound",
+                        color = c.muted,
+                        fontSize = 12.5.sp,
+                    )
+                }
+                PanelSwitch(state.alarmSound, onAlarmSoundChange, enabled = state.notify)
+            }
+            Divider()
+            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PanelButton("Send a test", onTestNotification, modifier = Modifier.weight(1f))
+                PanelButton("Sound settings", onSoundSettings, modifier = Modifier.weight(1f))
             }
         }
 
@@ -180,6 +186,23 @@ fun MainScreen(
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
     }
+}
+
+@Composable
+private fun PanelSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    val c = LocalPanel.current
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedTrackColor = c.primary,
+            checkedThumbColor = c.primaryForeground,
+            uncheckedTrackColor = c.secondary,
+            uncheckedBorderColor = c.border,
+            uncheckedThumbColor = c.muted,
+        ),
+    )
 }
 
 @Composable

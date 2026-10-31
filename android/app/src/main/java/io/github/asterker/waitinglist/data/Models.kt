@@ -31,6 +31,8 @@ data class AppState(
     val message: String? = null,
     val checking: Boolean = false,
     val notify: Boolean = true,
+    // Alarm sound (plays even on silent) rather than the normal notification sound.
+    val alarmSound: Boolean = true,
     val intervalMinutes: Int = 60,
 ) {
     val bestPosition: WaitingListEntry?

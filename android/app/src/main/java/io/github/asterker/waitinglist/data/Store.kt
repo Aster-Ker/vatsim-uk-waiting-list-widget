@@ -49,6 +49,7 @@ object Store {
             status = runCatching { Status.valueOf(prefs.getString("status", null)!!) }.getOrDefault(Status.Idle),
             message = prefs.getString("message", null),
             notify = prefs.getBoolean("notify", true),
+            alarmSound = prefs.getBoolean("alarmSound", true),
             intervalMinutes = prefs.getInt("interval", 60),
         )
     }
@@ -73,6 +74,7 @@ object Store {
             .putString("status", state.status.name)
             .putString("message", state.message)
             .putBoolean("notify", state.notify)
+            .putBoolean("alarmSound", state.alarmSound)
             .putInt("interval", state.intervalMinutes)
             .apply()
     }
