@@ -65,10 +65,15 @@ private fun App() {
 
     LaunchedEffect(Unit) {
         if (state.notify) requestNotificationPermission()
-        // First run: go straight to sign-in. Otherwise refresh when the app opens.
-        if (state.lastChecked == null && state.status == Status.Idle) {
+        // First run: go straight to sign-in. Otherwise only check if the last check is older
+        // than the chosen interval; Check now and the widget's refresh button check at any time.
+        val lastChecked = state.lastChecked
+        val intervalMillis = state.intervalMinutes * 60_000L
+        if (lastChecked == null && state.status == Status.Idle) {
             signIn.launch(Intent(context, LoginActivity::class.java))
-        } else if (state.status != Status.LoginRequired) {
+        } else if (state.status != Status.LoginRequired &&
+            (lastChecked == null || System.currentTimeMillis() - lastChecked >= intervalMillis)
+        ) {
             check()
         }
     }

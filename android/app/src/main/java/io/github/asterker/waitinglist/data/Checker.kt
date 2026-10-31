@@ -40,7 +40,7 @@ object Checker {
 
             FetchResult.LoginRequired -> {
                 Store.update { it.copy(status = Status.LoginRequired, message = null, checking = false) }
-                if (previous.status != Status.LoginRequired) Notifications.showSignInNeeded(app)
+                if (previous.status != Status.LoginRequired && previous.notify) Notifications.showSignInNeeded(app)
             }
 
             is FetchResult.Error -> Store.update {
