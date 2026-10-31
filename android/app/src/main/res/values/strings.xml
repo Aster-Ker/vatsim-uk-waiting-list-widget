@@ -2,5 +2,9 @@
 <resources>
     <string name="app_name">UK Waiting Lists</string>
     <string name="widget_name">Waiting lists</string>
-    <string name="widget_description">Your VATSIM UK waiting list positions</string>
+    <string name="widget_description">Your VATSIM UK waiting lists. Make it taller to see more lists.</string>
+    <string name="best_widget_name">Best position</string>
+    <string name="best_widget_description">Your best waiting list position, from a 1×1 tile up to a 2×2 card</string>
+    <string name="strip_widget_name">Positions strip</string>
+    <string name="strip_widget_description">Several waiting list positions side by side in one row</string>
 </resources>

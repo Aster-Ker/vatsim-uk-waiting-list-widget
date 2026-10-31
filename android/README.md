@@ -17,8 +17,8 @@ so a newer APK installs over the old one and keeps your sign-in and settings.
 1. The app opens a VATSIM sign-in page. Log in, and it closes by itself once your waiting lists load.
    The app never sees your password; it keeps vatsim.uk's sign-in cookies on your phone.
 2. Allow notifications when asked.
-3. Long-press your home screen → **Widgets** → **UK Waiting Lists**, or use **Add** in the app's
-   Home screen section.
+3. Long-press your home screen → **Widgets** → **UK Waiting Lists** and pick a widget, or use **Add**
+   in the app's Home screen section.
 
 ## What it does
 
@@ -27,7 +27,10 @@ so a newer APK installs over the old one and keeps your sign-in and settings.
 - Position alerts pop up, vibrate and ring with your alarm sound, even on silent. Turn off **Alarm sound** in the app to use your normal notification sound instead; **Sound settings** opens Android's settings for that alert.
 - Highlights lists that moved in the last 24 hours
 - Checks in the background every 15 minutes to 6 hours (default 1 hour)
-- Widget: small sizes show your best position; larger sizes list your waiting lists, with a refresh button
+- Three home screen widgets, all resizable:
+  - **Best position**: 1×1 shows just the number, 2×1 adds the list name, 2×2 is a card
+  - **Positions strip**: a 4×1 row with 2–5 lists side by side, depending on width
+  - **Waiting lists**: a full list with a refresh button, showing 1–6 rows depending on height
 - Light and dark themes styled after [PanelUI](https://panelui.dev), following your phone's setting
 
 ## Build

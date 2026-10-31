@@ -134,7 +134,7 @@
         android:layout_height="wrap_content"
         android:paddingStart="4dp"
         android:paddingTop="8dp"
-        android:text="Open the app to sign in."
+        android:text="Your waiting lists appear here."
         android:textColor="@color/panel_muted"
         android:textSize="12.5sp" />
 </LinearLayout>
