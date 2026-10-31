@@ -1,10 +1,16 @@
 name: Release
 
-# Push a tag like v1.2.0 to build both apps and publish them as a GitHub release.
+# Builds both apps and publishes them as a GitHub release. Start it from the Actions tab
+# (Release → Run workflow, then type a version like v1.2.0), or push a tag like v1.2.0.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, e.g. v1.2.0"
+        required: true
 
 permissions:
   contents: write
@@ -57,7 +63,9 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.version || github.ref_name }}
+          name: ${{ inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           body_path: .github/RELEASE_NOTES.md
           files: |
             dist/UKWaitingLists.apk
