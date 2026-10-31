@@ -29,6 +29,7 @@ jobs:
 
       - name: Build APK
         run: |
+          set -o pipefail
           status=0
           ./gradlew assembleDebug --console=plain 2>&1 | tee build.log || status=$?
           if [ "$status" -ne 0 ]; then
