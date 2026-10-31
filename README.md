@@ -1,5 +1,7 @@
 # VATSIM UK Waiting List Widget
 
+> **Android:** there's also an Android app with a home screen widget in [`android/`](android/README.md).
+
 A small always-on-top Windows desktop widget that shows your positions on the
 VATSIM UK waiting lists (https://www.vatsim.uk/mship/waiting-lists) and pops a
 notification when a position changes.
