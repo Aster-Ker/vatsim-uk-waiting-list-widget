@@ -22,67 +22,8 @@ import io.github.asterker.waitinglist.data.SessionsState
 import io.github.asterker.waitinglist.data.SessionsSync
 import io.github.asterker.waitinglist.data.TrainingRecord
 
-private const val MAX_UPCOMING = 4
-private const val MAX_HISTORY = 5
-
 @Composable
-fun SessionsSection(sessions: SessionsState, now: Long, onOpenPage: (String) -> Unit, onShowAll: () -> Unit) {
-    val c = LocalPanel.current
-    val upcoming = sessions.upcoming(now)
-    val remindMillis = sessions.remindMinutes * 60_000L
-
-    SectionLabel("Next session")
-    PanelCard {
-        val next = upcoming.firstOrNull()
-        if (next == null) {
-            val text = when {
-                sessions.lastChecked == null && sessions.message == null -> "Checking your bookings…"
-                sessions.feedUrl == null && sessions.message != null -> sessions.message
-                else -> "No upcoming bookings."
-            }
-            Text(text, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
-        } else {
-            NextSession(next, next.phase(now, remindMillis), now, onOpenPage)
-        }
-    }
-
-    val later = upcoming.drop(1).take(MAX_UPCOMING)
-    if (later.isNotEmpty()) {
-        Spacer(Modifier.height(12.dp))
-        PanelCard {
-            later.forEachIndexed { i, booking ->
-                if (i > 0) Divider()
-                BookingRow(booking, now)
-            }
-        }
-    }
-
-    if (sessions.historyAvailable && sessions.history.isNotEmpty()) {
-        Spacer(Modifier.height(24.dp))
-        SectionLabel("Recent training")
-        PanelCard {
-            sessions.history.take(MAX_HISTORY).forEachIndexed { i, record ->
-                if (i > 0) Divider()
-                HistoryRow(record, onOpenPage)
-            }
-        }
-    }
-
-    Spacer(Modifier.height(12.dp))
-    PanelButton("All sessions", onShowAll, modifier = Modifier.fillMaxWidth())
-
-    if (sessions.message != null && sessions.feedUrl != null) {
-        Text(
-            sessions.message,
-            color = c.destructive.foreground,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(start = 4.dp, top = 8.dp),
-        )
-    }
-}
-
-@Composable
-private fun NextSession(booking: SessionBooking, phase: SessionPhase, now: Long, onOpenPage: (String) -> Unit) {
+fun NextSession(booking: SessionBooking, phase: SessionPhase, now: Long, onOpenPage: (String) -> Unit) {
     val c = LocalPanel.current
     Column(Modifier.padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -108,61 +49,6 @@ private fun NextSession(booking: SessionBooking, phase: SessionPhase, now: Long,
         booking.url?.let { url ->
             Spacer(Modifier.height(12.dp))
             PanelButton("Open on vatsim.uk", { onOpenPage(url) }, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-@Composable
-private fun BookingRow(booking: SessionBooking, now: Long) {
-    val c = LocalPanel.current
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(booking.title, color = c.foreground, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                listOfNotNull(SessionsSync.timeRange(booking), booking.withWhom).joinToString(" · "),
-                color = c.muted,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Text("in ${relative(booking.start - now)}", color = c.muted, fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun HistoryRow(record: TrainingRecord, onOpenPage: (String) -> Unit) {
-    val c = LocalPanel.current
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    record.position.ifBlank { "Session" },
-                    color = c.foreground,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                when (record.status) {
-                    "Completed" -> RoleBadge("Report filed", c.success)
-                    "Pending" -> RoleBadge("Awaiting report", c.info)
-                    "Cancelled" -> RoleBadge("Cancelled", c.destructive)
-                    "No Show" -> RoleBadge("No show", c.warning)
-                    else -> RoleBadge(record.status, c.info)
-                }
-            }
-            Text(
-                listOf(record.date, record.mentor).filter { it.isNotBlank() }.joinToString(" · "),
-                color = c.muted,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        record.reportUrl?.let { url ->
-            Spacer(Modifier.width(12.dp))
-            PanelButton("Read", { onOpenPage(url) })
         }
     }
 }

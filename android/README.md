@@ -16,10 +16,17 @@ so a newer APK installs over the old one and keeps your sign-in and settings.
 1. The app opens a VATSIM sign-in page. Log in, and it closes by itself once your waiting lists load.
    The app never sees your password; it keeps vatsim.uk's sign-in cookies on your phone.
 2. Allow notifications when asked.
-3. Long-press your home screen → **Widgets** → **UK Waiting Lists** and pick a widget, or use **Add**
-   in the app's Home screen section.
+3. Long-press your home screen → **Widgets** → **UK Waiting Lists** and pick a widget, or use **Add** next to
+   a widget in the app's Settings page.
 
 ## What it does
+
+The app has three pages, switched with the bar at the bottom:
+
+- **Sessions**: your next session with a countdown, then every upcoming session by day and past ones with their report status
+- **Lists**: your waiting list positions, with **Check now**
+- **Settings**: alerts, session reminders, check interval, home screen widgets and your account
+
 
 - Lists every ATC and pilot waiting list you're on: position, ▲/▼ for the last change, join date and theory exam status
 - Notifies you when a position moves, you're added to or removed from a list, a theory exam passes, or you need to sign in again
@@ -29,8 +36,8 @@ so a newer APK installs over the old one and keeps your sign-in and settings.
 - **Sessions:** your ATC bookings, mentoring sessions and exams from vatsim.uk, found automatically from the
   dashboard's calendar link
   - A **Next session** card with a live countdown: upcoming, starting soon, in progress
-  - **All sessions** lists every upcoming event by day, and past ones with their report status. Tap an event to
-    open it on vatsim.uk, read the feedback or add it to your phone's calendar
+  - Every upcoming event by day, and past ones with their report status. Tap an event to open it on
+    vatsim.uk, read the feedback or add it to your phone's calendar
   - A **reminder alarm** before each session (10 minutes to 2 hours, default 30 minutes)
   - Alerts when a session is booked, moved or removed, and when your mentor files feedback; the report opens
     in the app, already signed in

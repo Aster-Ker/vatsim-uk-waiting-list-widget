@@ -1,31 +1,45 @@
 package io.github.asterker.waitinglist.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
-import kotlinx.coroutines.delay
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,33 +47,59 @@ import androidx.compose.ui.unit.sp
 import io.github.asterker.waitinglist.data.AppState
 import io.github.asterker.waitinglist.data.IntervalChoices
 import io.github.asterker.waitinglist.data.ReminderChoices
+import io.github.asterker.waitinglist.data.SessionBooking
 import io.github.asterker.waitinglist.data.Status
 import io.github.asterker.waitinglist.data.WaitingListEntry
 import io.github.asterker.waitinglist.data.formatInterval
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// Everything the pages can ask the activity to do.
+class Actions(
+    val checkNow: () -> Unit,
+    val signIn: () -> Unit,
+    val openWebsite: () -> Unit,
+    val openPage: (String) -> Unit,
+    val addToCalendar: (SessionBooking) -> Unit,
+    val setNotify: (Boolean) -> Unit,
+    val setAlarmSound: (Boolean) -> Unit,
+    val openSoundSettings: () -> Unit,
+    val testNotification: () -> Unit,
+    val setSessionAlerts: (Boolean) -> Unit,
+    val setRemindMinutes: (Int) -> Unit,
+    val setInterval: (Int) -> Unit,
+    val pinWidget: (WidgetKind) -> Unit,
+    val signOut: () -> Unit,
+)
+
+enum class WidgetKind(val title: String, val description: String) {
+    NextSession("Next session", "Your next booking with a countdown"),
+    BestPosition("Best position", "Your best waiting list position, 1×1 to 2×2"),
+    PositionsStrip("Positions strip", "Several waiting lists side by side in one row"),
+    WaitingLists("Waiting lists", "Every list; make it taller to see more"),
+}
+
+private enum class Page(val label: String, val title: String, val icon: ImageVector) {
+    Sessions("Sessions", "Sessions", icon("M20,3h-1V1h-2v2H7V1H5v2H4C2.9,3 2,3.9 2,5v16c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V5C22,3.9 21.1,3 20,3zM20,21H4V8h16V21z")),
+    WaitingLists("Lists", "Waiting lists", icon("M2,17h2v0.5H3v1h1v0.5H2v1h3v-4H2v1zM3,8h1V4H2v1h1v3zM2,11h1.8L2,13.1v0.9h3v-1H3.2L5,10.9V10H2v1zM7,5v2h14V5H7zM7,19h14v-2H7v2zM7,13h14v-2H7v2z")),
+    Settings("Settings", "Settings", icon("M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z")),
+}
+
+private fun icon(path: String): ImageVector =
+    ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black))
+        .build()
+
 @Composable
-fun MainScreen(
-    state: AppState,
-    canPinWidget: Boolean,
-    onCheckNow: () -> Unit,
-    onSignIn: () -> Unit,
-    onOpenWebsite: () -> Unit,
-    onNotifyChange: (Boolean) -> Unit,
-    onAlarmSoundChange: (Boolean) -> Unit,
-    onSoundSettings: () -> Unit,
-    onIntervalChange: (Int) -> Unit,
-    onTestNotification: () -> Unit,
-    onPinWidget: () -> Unit,
-    onSignOut: () -> Unit,
-    onOpenPage: (String) -> Unit,
-    onSessionAlertsChange: (Boolean) -> Unit,
-    onRemindChange: (Int) -> Unit,
-    onShowAllSessions: () -> Unit,
-) {
+fun MainScreen(state: AppState, canPinWidget: Boolean, actions: Actions) {
     val c = LocalPanel.current
+    var pageIndex by rememberSaveable { mutableIntStateOf(0) }
+    val page = Page.entries[pageIndex]
+    // Back from another page returns to Sessions before leaving the app.
+    BackHandler(enabled = page != Page.Sessions) { pageIndex = 0 }
+
     // Ticks so countdowns stay current while the screen is open.
     val now by produceState(System.currentTimeMillis()) {
         while (true) {
@@ -67,171 +107,237 @@ fun MainScreen(
             value = System.currentTimeMillis()
         }
     }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(c.background)
-            .verticalScroll(rememberScrollState())
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Header(state)
-        Spacer(Modifier.height(16.dp))
 
-        if (state.status == Status.LoginRequired) {
-            PanelAlert(c.warning, "Sign in needed", "Your vatsim.uk session has expired.", "Sign in", onSignIn)
-            Spacer(Modifier.height(12.dp))
-        }
+    Column(Modifier.fillMaxSize().background(c.background)) {
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Header(page.title, state)
+            Spacer(Modifier.height(16.dp))
 
-        SessionsSection(state.sessions, now, onOpenPage, onShowAllSessions)
-
-        Spacer(Modifier.height(24.dp))
-        SectionLabel("Waiting lists")
-
-        when (state.status) {
-            Status.Error -> if (!state.checking) {
-                PanelAlert(c.destructive, "Couldn't check vatsim.uk", state.message ?: "Something went wrong.", "Retry", onCheckNow)
-                Spacer(Modifier.height(12.dp))
+            if (state.status == Status.LoginRequired && page != Page.Settings) {
+                PanelAlert(c.warning, "Sign in needed", "Your vatsim.uk session has expired.", "Sign in", actions.signIn)
+                Spacer(Modifier.height(16.dp))
             }
-            else -> Unit
-        }
 
-        PanelCard {
-            if (state.lists.isEmpty()) {
-                val text = when {
-                    state.status == Status.Ok -> "You aren't on any waiting lists."
-                    state.checking -> "Checking vatsim.uk…"
-                    else -> "No data yet. Sign in to see your waiting lists."
+            when (page) {
+                Page.Sessions -> SessionsPage(state.sessions, now, actions.openPage, actions.addToCalendar)
+                Page.WaitingLists -> WaitingListsPage(state, actions)
+                Page.Settings -> SettingsPage(state, canPinWidget, actions)
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+        BottomBar(page) { pageIndex = it.ordinal }
+    }
+}
+
+@Composable
+private fun BottomBar(current: Page, onSelect: (Page) -> Unit) {
+    val c = LocalPanel.current
+    Column(Modifier.fillMaxWidth().background(c.card)) {
+        Divider()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Page.entries.forEach { page ->
+                val selected = page == current
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) c.secondary else Color.Transparent)
+                        .clickable { onSelect(page) }
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(page.icon, contentDescription = null, tint = if (selected) c.foreground else c.muted, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        page.label,
+                        color = if (selected) c.foreground else c.muted,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    )
                 }
-                Text(text, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
-            }
-            state.lists.forEachIndexed { i, entry ->
-                if (i > 0) Divider()
-                ListRow(entry)
             }
         }
+    }
+}
 
+@Composable
+private fun Header(title: String, state: AppState) {
+    val c = LocalPanel.current
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = c.foreground, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text("VATSIM UK", color = c.muted, fontSize = 14.sp)
+        }
+        when {
+            state.checking -> RoleBadge("Checking", c.info, dot = true)
+            state.status == Status.Ok -> RoleBadge("Up to date", c.success, dot = true)
+            state.status == Status.LoginRequired -> RoleBadge("Sign in", c.warning, dot = true)
+            state.status == Status.Error -> RoleBadge("Error", c.destructive, dot = true)
+            else -> RoleBadge("Starting", c.info, dot = true)
+        }
+    }
+}
+
+// ---------- Waiting lists page ----------
+
+@Composable
+private fun WaitingListsPage(state: AppState, actions: Actions) {
+    val c = LocalPanel.current
+    if (state.status == Status.Error && !state.checking) {
+        PanelAlert(c.destructive, "Couldn't check vatsim.uk", state.message ?: "Something went wrong.", "Retry", actions.checkNow)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PanelButton(
-                if (state.checking) "Checking…" else "Check now",
-                onCheckNow,
-                style = ButtonStyle.Primary,
-                enabled = !state.checking,
-                modifier = Modifier.weight(1f),
+    }
+
+    PanelCard {
+        if (state.lists.isEmpty()) {
+            val text = when {
+                state.status == Status.Ok -> "You aren't on any waiting lists."
+                state.checking -> "Checking vatsim.uk…"
+                else -> "No data yet. Sign in to see your waiting lists."
+            }
+            Text(text, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
+        }
+        state.lists.forEachIndexed { i, entry ->
+            if (i > 0) Divider()
+            ListRow(entry)
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        PanelButton(
+            if (state.checking) "Checking…" else "Check now",
+            actions.checkNow,
+            style = ButtonStyle.Primary,
+            enabled = !state.checking,
+            modifier = Modifier.weight(1f),
+        )
+        PanelButton("Open vatsim.uk", actions.openWebsite, modifier = Modifier.weight(1f))
+    }
+    Spacer(Modifier.height(8.dp))
+    val checked = state.lastChecked?.let { "Last checked " + SimpleDateFormat("EEE d MMM, HH:mm", Locale.UK).format(Date(it)) }
+    Text(
+        listOfNotNull(checked, "checks every ${formatInterval(state.intervalMinutes)}").joinToString(" · "),
+        color = c.muted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(start = 4.dp),
+    )
+}
+
+// ---------- Settings page ----------
+
+@Composable
+private fun SettingsPage(state: AppState, canPinWidget: Boolean, actions: Actions) {
+    val c = LocalPanel.current
+
+    SectionLabel("Waiting list alerts")
+    PanelCard {
+        SettingRow("Position changes", "Notify me when a waiting list position moves") {
+            PanelSwitch(state.notify, actions.setNotify)
+        }
+        Divider()
+        SettingRow(
+            "Alarm sound",
+            if (state.alarmSound) "Rings with your alarm sound and vibrates, even on silent"
+            else "Uses your normal notification sound",
+        ) {
+            PanelSwitch(state.alarmSound, actions.setAlarmSound, enabled = state.notify)
+        }
+        Divider()
+        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PanelButton("Send a test", actions.testNotification, modifier = Modifier.weight(1f))
+            PanelButton("Sound settings", actions.openSoundSettings, modifier = Modifier.weight(1f))
+        }
+    }
+
+    Spacer(Modifier.height(24.dp))
+    SectionLabel("Session reminders")
+    PanelCard {
+        SettingRow(
+            "Session alerts",
+            "A reminder before each booked session, plus alerts when bookings change or a mentor files feedback",
+        ) {
+            PanelSwitch(state.sessions.alerts, actions.setSessionAlerts)
+        }
+        Divider()
+        Column(Modifier.padding(16.dp)) {
+            Text("Remind me before a session", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(10.dp))
+            Segmented(
+                options = ReminderChoices.map { if (it < 60) "${it}m" else "${it / 60}h" },
+                selected = ReminderChoices.indexOf(state.sessions.remindMinutes).coerceAtLeast(0),
+                onSelect = { actions.setRemindMinutes(ReminderChoices[it]) },
             )
-            PanelButton("Open vatsim.uk", onOpenWebsite, modifier = Modifier.weight(1f))
         }
-        Spacer(Modifier.height(8.dp))
-        val checked = state.lastChecked?.let { "Last checked " + SimpleDateFormat("EEE d MMM, HH:mm", Locale.UK).format(Date(it)) }
-        Text(
-            listOfNotNull(checked, "checks every ${formatInterval(state.intervalMinutes)}").joinToString(" · "),
-            color = c.muted,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(start = 4.dp),
-        )
+    }
 
+    Spacer(Modifier.height(24.dp))
+    SectionLabel("Check every")
+    Segmented(
+        options = IntervalChoices.map { if (it < 60) "${it}m" else "${it / 60}h" },
+        selected = IntervalChoices.indexOf(state.intervalMinutes).coerceAtLeast(0),
+        onSelect = { actions.setInterval(IntervalChoices[it]) },
+    )
+    Text(
+        "Applies to waiting lists, bookings and feedback. Reminder alarms are set separately, so they ring on time.",
+        color = c.muted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+    )
+
+    if (canPinWidget) {
         Spacer(Modifier.height(24.dp))
-        SectionLabel("Notifications")
+        SectionLabel("Home screen widgets")
         PanelCard {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Position changes", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text("Notify me when a waiting list position moves", color = c.muted, fontSize = 12.5.sp)
-                }
-                PanelSwitch(state.notify, onNotifyChange)
-            }
-            Divider()
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Alarm sound", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text(
-                        if (state.alarmSound) "Rings with your alarm sound and vibrates, even on silent"
-                        else "Uses your normal notification sound",
-                        color = c.muted,
-                        fontSize = 12.5.sp,
-                    )
-                }
-                PanelSwitch(state.alarmSound, onAlarmSoundChange, enabled = state.notify)
-            }
-            Divider()
-            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PanelButton("Send a test", onTestNotification, modifier = Modifier.weight(1f))
-                PanelButton("Sound settings", onSoundSettings, modifier = Modifier.weight(1f))
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-        SectionLabel("Session reminders")
-        PanelCard {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Session alerts", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text(
-                        "A reminder before each booked session, plus alerts when bookings change or a mentor files feedback",
-                        color = c.muted,
-                        fontSize = 12.5.sp,
-                    )
-                }
-                PanelSwitch(state.sessions.alerts, onSessionAlertsChange)
-            }
-            Divider()
-            Column(Modifier.padding(16.dp)) {
-                Text("Remind me before a session", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(10.dp))
-                Segmented(
-                    options = ReminderChoices.map { if (it < 60) "${it}m" else "${it / 60}h" },
-                    selected = ReminderChoices.indexOf(state.sessions.remindMinutes).coerceAtLeast(0),
-                    onSelect = { onRemindChange(ReminderChoices[it]) },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-        SectionLabel("Check every")
-        val selected = IntervalChoices.indexOf(state.intervalMinutes).coerceAtLeast(0)
-        Segmented(
-            options = IntervalChoices.map { if (it < 60) "${it}m" else "${it / 60}h" },
-            selected = selected,
-            onSelect = { onIntervalChange(IntervalChoices[it]) },
-        )
-        Text(
-            "Applies to waiting lists, bookings and feedback. Reminder alarms are set separately, so they ring on time.",
-            color = c.muted,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(start = 4.dp, top = 8.dp),
-        )
-
-        if (canPinWidget) {
-            Spacer(Modifier.height(24.dp))
-            SectionLabel("Home screen")
-            PanelCard {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Waiting list widget", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("Resize it small for your best position, or larger for every list", color = c.muted, fontSize = 12.5.sp)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    PanelButton("Add", onPinWidget)
+            WidgetKind.entries.forEachIndexed { i, kind ->
+                if (i > 0) Divider()
+                SettingRow(kind.title, kind.description) {
+                    PanelButton("Add", { actions.pinWidget(kind) })
                 }
             }
         }
+    }
 
-        Spacer(Modifier.height(24.dp))
-        SectionLabel("Account")
-        PanelCard {
-            Row(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
-                PanelButton("Sign in again", onSignIn, style = ButtonStyle.Ghost, modifier = Modifier.weight(1f))
-                PanelButton("Sign out", onSignOut, style = ButtonStyle.Destructive, modifier = Modifier.weight(1f))
-            }
+    Spacer(Modifier.height(24.dp))
+    SectionLabel("Account")
+    PanelCard {
+        Row(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+            PanelButton("Sign in again", actions.signIn, style = ButtonStyle.Ghost, modifier = Modifier.weight(1f))
+            PanelButton("Sign out", actions.signOut, style = ButtonStyle.Destructive, modifier = Modifier.weight(1f))
         }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Unofficial app. Not affiliated with VATSIM or VATSIM UK.",
-            color = c.muted,
-            fontSize = 11.5.sp,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-        )
+    }
+    Spacer(Modifier.height(16.dp))
+    Text(
+        "Unofficial app. Not affiliated with VATSIM or VATSIM UK.",
+        color = c.muted,
+        fontSize = 11.5.sp,
+        modifier = Modifier.padding(start = 4.dp),
+    )
+}
+
+@Composable
+private fun SettingRow(title: String, description: String, control: @Composable () -> Unit) {
+    val c = LocalPanel.current
+    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(description, color = c.muted, fontSize = 12.5.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        control()
     }
 }
 
@@ -250,24 +356,6 @@ private fun PanelSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, en
             uncheckedThumbColor = c.muted,
         ),
     )
-}
-
-@Composable
-private fun Header(state: AppState) {
-    val c = LocalPanel.current
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-        Column(Modifier.weight(1f)) {
-            Text("VATSIM UK", color = c.foreground, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-            Text("Training and waiting lists", color = c.muted, fontSize = 14.sp)
-        }
-        when {
-            state.checking -> RoleBadge("Checking", c.info, dot = true)
-            state.status == Status.Ok -> RoleBadge("Up to date", c.success, dot = true)
-            state.status == Status.LoginRequired -> RoleBadge("Sign in", c.warning, dot = true)
-            state.status == Status.Error -> RoleBadge("Error", c.destructive, dot = true)
-            else -> RoleBadge("Starting", c.info, dot = true)
-        }
-    }
 }
 
 @Composable

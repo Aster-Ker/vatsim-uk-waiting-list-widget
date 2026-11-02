@@ -1,6 +1,5 @@
 package io.github.asterker.waitinglist.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,56 +41,55 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-// Every session event: upcoming bookings grouped by day, and past ones with their report status.
+// The Sessions page: the next session with a countdown, then every session event: upcoming
+// bookings grouped by day, and past ones with their report status.
 @Composable
-fun SessionsScreen(
+fun SessionsPage(
     sessions: SessionsState,
     now: Long,
-    onBack: () -> Unit,
     onOpenPage: (String) -> Unit,
     onAddToCalendar: (SessionBooking) -> Unit,
 ) {
-    BackHandler(onBack = onBack)
     val c = LocalPanel.current
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     var expanded by remember { mutableStateOf<String?>(null) }
     val remindMillis = sessions.remindMinutes * 60_000L
+    val upcoming = sessions.upcoming(now)
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(c.background)
-            .verticalScroll(rememberScrollState())
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PanelButton("‹ Back", onBack, style = ButtonStyle.Ghost)
+    Column {
+        SectionLabel("Next session")
+        PanelCard {
+            val next = upcoming.firstOrNull()
+            if (next == null) {
+                val text = when {
+                    sessions.lastChecked == null && sessions.message == null -> "Checking your bookings…"
+                    sessions.feedUrl == null && sessions.message != null -> sessions.message
+                    else -> "No upcoming bookings."
+                }
+                Text(text, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
+            } else {
+                NextSession(next, next.phase(now, remindMillis), now, onOpenPage)
+            }
         }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Sessions",
-            color = c.foreground,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        Text(
-            "Bookings, mentoring sessions and exams from vatsim.uk",
-            color = c.muted,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        Spacer(Modifier.height(16.dp))
+        if (sessions.message != null && sessions.feedUrl != null) {
+            Text(
+                sessions.message,
+                color = c.destructive.foreground,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
         Segmented(listOf("Upcoming", "Past"), tab, { tab = it })
         Spacer(Modifier.height(16.dp))
 
         if (tab == 0) {
-            val upcoming = sessions.upcoming(now)
-            if (upcoming.isEmpty()) {
-                EmptyCard("No upcoming bookings.")
+            val later = upcoming.drop(1)
+            if (later.isEmpty()) {
+                EmptyCard(if (upcoming.isEmpty()) "No upcoming bookings." else "Nothing else booked after your next session.")
             }
-            upcoming.groupBy { dayLabel(it.start, now) }.forEach { (day, bookings) ->
+            later.groupBy { dayLabel(it.start, now) }.forEach { (day, bookings) ->
                 SectionLabel(day)
                 PanelCard {
                     bookings.forEachIndexed { i, booking ->

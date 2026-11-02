@@ -17,8 +17,8 @@ on the vatsim.uk dashboard automatically, so there's nothing to set up.
 - **Booking alerts** when a session is booked, moved or removed
 - **Mentor feedback:** a notification when your mentor files the report, from My Training History; tap to read it
 
-On Android there's also an **All sessions** screen (upcoming by day, past with report status, add to calendar) and a
-**Next session** home screen widget. On Windows the widget shows your next three sessions, and reminders stay on
+On Android the app is now split into **Sessions**, **Lists** and **Settings** pages. Sessions shows upcoming events
+by day and past ones with their report status, with add-to-calendar, and there's a new **Next session** home screen widget. On Windows the widget shows your next three sessions, and reminders stay on
 screen until dismissed.
 
 ## Also included
