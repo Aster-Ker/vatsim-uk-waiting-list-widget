@@ -7,4 +7,6 @@
     <string name="best_widget_description">Your best waiting list position, from a 1×1 tile up to a 2×2 card</string>
     <string name="strip_widget_name">Positions strip</string>
     <string name="strip_widget_description">Several waiting list positions side by side in one row</string>
+    <string name="session_widget_name">Next session</string>
+    <string name="session_widget_description">Your next booking or mentoring session, with a countdown</string>
 </resources>

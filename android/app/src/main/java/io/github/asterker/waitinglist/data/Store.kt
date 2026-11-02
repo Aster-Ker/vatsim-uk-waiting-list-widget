@@ -51,6 +51,7 @@ object Store {
             notify = prefs.getBoolean("notify", true),
             alarmSound = prefs.getBoolean("alarmSound", true),
             intervalMinutes = prefs.getInt("interval", 60),
+            sessions = runCatching { loadSessions(JSONObject(prefs.getString("sessions", "{}")!!)) }.getOrDefault(SessionsState()),
         )
     }
 
@@ -76,10 +77,86 @@ object Store {
             .putBoolean("notify", state.notify)
             .putBoolean("alarmSound", state.alarmSound)
             .putInt("interval", state.intervalMinutes)
+            .putString("sessions", saveSessions(state.sessions).toString())
             .apply()
+    }
+
+    private fun loadSessions(o: JSONObject): SessionsState {
+        val bookings = o.optJSONArray("bookings") ?: JSONArray()
+        val history = o.optJSONArray("history") ?: JSONArray()
+        return SessionsState(
+            feedUrl = o.stringOrNull("feedUrl"),
+            bookings = (0 until bookings.length()).map { i ->
+                val b = bookings.getJSONObject(i)
+                SessionBooking(
+                    uid = b.getString("uid"),
+                    kind = b.optString("kind"),
+                    position = b.stringOrNull("position"),
+                    start = b.getLong("start"),
+                    end = b.getLong("end"),
+                    mentor = b.stringOrNull("mentor"),
+                    examiner = b.stringOrNull("examiner"),
+                    student = b.stringOrNull("student"),
+                    url = b.stringOrNull("url"),
+                )
+            },
+            history = (0 until history.length()).map { i ->
+                val h = history.getJSONObject(i)
+                TrainingRecord(
+                    id = h.getString("id"),
+                    position = h.optString("position"),
+                    date = h.optString("date"),
+                    mentor = h.optString("mentor"),
+                    status = h.optString("status"),
+                    reportUrl = h.stringOrNull("reportUrl"),
+                )
+            },
+            historyAvailable = o.optBoolean("historyAvailable", true),
+            lastChecked = o.longOrNull("lastChecked"),
+            message = o.stringOrNull("message"),
+            alerts = o.optBoolean("alerts", true),
+            remindMinutes = o.optInt("remindMinutes", 30),
+        )
+    }
+
+    private fun saveSessions(s: SessionsState): JSONObject = JSONObject().apply {
+        putOpt("feedUrl", s.feedUrl)
+        put("bookings", JSONArray().apply {
+            s.bookings.forEach { b ->
+                put(JSONObject().apply {
+                    put("uid", b.uid)
+                    put("kind", b.kind)
+                    putOpt("position", b.position)
+                    put("start", b.start)
+                    put("end", b.end)
+                    putOpt("mentor", b.mentor)
+                    putOpt("examiner", b.examiner)
+                    putOpt("student", b.student)
+                    putOpt("url", b.url)
+                })
+            }
+        })
+        put("history", JSONArray().apply {
+            s.history.forEach { h ->
+                put(JSONObject().apply {
+                    put("id", h.id)
+                    put("position", h.position)
+                    put("date", h.date)
+                    put("mentor", h.mentor)
+                    put("status", h.status)
+                    putOpt("reportUrl", h.reportUrl)
+                })
+            }
+        })
+        put("historyAvailable", s.historyAvailable)
+        putOpt("lastChecked", s.lastChecked)
+        putOpt("message", s.message)
+        put("alerts", s.alerts)
+        put("remindMinutes", s.remindMinutes)
     }
 
     private fun JSONObject.intOrNull(name: String): Int? = if (has(name) && !isNull(name)) getInt(name) else null
     private fun JSONObject.longOrNull(name: String): Long? = if (has(name) && !isNull(name)) getLong(name) else null
+    private fun JSONObject.stringOrNull(name: String): String? = if (has(name) && !isNull(name)) getString(name) else null
     private fun JSONObject.boolOrNull(name: String): Boolean? = if (has(name) && !isNull(name)) getBoolean(name) else null
 }

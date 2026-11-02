@@ -13,12 +13,27 @@ import java.net.URL
 object WaitingListClient {
     const val WAITING_LISTS_URL = "https://www.vatsim.uk/mship/waiting-lists"
 
-    fun fetch(context: Context): FetchResult {
+    sealed interface Page {
+        data class Html(val html: String, val url: String) : Page
+        data object LoginRequired : Page
+        data class Failed(val code: Int?, val message: String) : Page
+    }
+
+    fun fetch(context: Context): FetchResult = when (val page = fetchPage(context, WAITING_LISTS_URL, this::isWaitingListsPage)) {
+        is Page.Html -> parse(page.html, page.url)
+        Page.LoginRequired -> FetchResult.LoginRequired
+        is Page.Failed -> FetchResult.Error(page.message)
+    }
+
+    // GETs a signed-in vatsim.uk page, following redirects by hand so cookies stay in step
+    // with the sign-in WebView. Ending anywhere other than a page isTarget accepts means
+    // the session has expired.
+    fun fetchPage(context: Context, startUrl: String, isTarget: (URL) -> Boolean): Page {
         val cookies = CookieManager.getInstance()
         val userAgent = runCatching { WebSettings.getDefaultUserAgent(context) }
             .getOrDefault("Mozilla/5.0 (Linux; Android) UKWaitingLists")
 
-        var url = URL(WAITING_LISTS_URL)
+        var url = URL(startUrl)
         try {
             for (hop in 0 until 8) {
                 val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -38,25 +53,25 @@ object WaitingListClient {
 
                     if (code in 300..399) {
                         val location = connection.getHeaderField("Location")
-                            ?: return FetchResult.Error("vatsim.uk sent a redirect with no address")
+                            ?: return Page.Failed(code, "vatsim.uk sent a redirect with no address")
                         val next = URL(url, location)
                         // Being sent to sign in (on vatsim.uk or VATSIM SSO) means the session has expired.
-                        if (!isVatsimUk(next) || next.path.startsWith("/login")) return FetchResult.LoginRequired
+                        if (!isVatsimUk(next) || next.path.startsWith("/login")) return Page.LoginRequired
                         url = next
                         continue
                     }
-                    if (code != 200) return FetchResult.Error("vatsim.uk returned HTTP $code")
-                    if (!isWaitingListsPage(url)) return FetchResult.LoginRequired
+                    if (code != 200) return Page.Failed(code, "vatsim.uk returned HTTP $code")
+                    if (!isTarget(url)) return Page.LoginRequired
 
                     val html = connection.inputStream.bufferedReader().use { it.readText() }
-                    return parse(html, url.toString())
+                    return Page.Html(html, url.toString())
                 } finally {
                     connection.disconnect()
                 }
             }
-            return FetchResult.Error("Too many redirects from vatsim.uk")
+            return Page.Failed(null, "Too many redirects from vatsim.uk")
         } catch (e: IOException) {
-            return FetchResult.Error("Couldn't reach vatsim.uk (${e.message ?: e.javaClass.simpleName})")
+            return Page.Failed(null, "Couldn't reach vatsim.uk (${e.message ?: e.javaClass.simpleName})")
         } finally {
             cookies.flush()
         }

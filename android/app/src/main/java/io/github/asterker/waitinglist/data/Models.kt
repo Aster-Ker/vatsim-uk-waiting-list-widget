@@ -34,6 +34,7 @@ data class AppState(
     // Alarm sound (plays even on silent) rather than the normal notification sound.
     val alarmSound: Boolean = true,
     val intervalMinutes: Int = 60,
+    val sessions: SessionsState = SessionsState(),
 ) {
     val bestPosition: WaitingListEntry?
         get() = lists.filter { it.position != null }.minByOrNull { it.position!! }
@@ -52,3 +53,62 @@ fun formatInterval(minutes: Int): String = when {
     minutes == 60 -> "1 hour"
     else -> "${minutes / 60} hours"
 }
+
+// A booking from the member's VATSIM UK calendar feed: ATC booking, mentoring session or exam.
+data class SessionBooking(
+    val uid: String,
+    val kind: String,
+    val position: String?,
+    val start: Long,
+    val end: Long,
+    val mentor: String? = null,
+    val examiner: String? = null,
+    val student: String? = null,
+    val url: String? = null,
+) {
+    // The feed names the student only when you're the mentor or examiner.
+    val asInstructor: Boolean get() = student != null
+    val title: String get() = listOfNotNull(position, kind).joinToString(" · ")
+    val withWhom: String?
+        get() = when {
+            student != null -> "Student: $student"
+            mentor != null -> "Mentor: $mentor"
+            examiner != null -> "Examiner: $examiner"
+            else -> null
+        }
+
+    fun phase(now: Long, remindMillis: Long): SessionPhase = when {
+        now >= end -> SessionPhase.Finished
+        now >= start -> SessionPhase.InProgress
+        start - now <= remindMillis -> SessionPhase.StartingSoon
+        else -> SessionPhase.Upcoming
+    }
+}
+
+enum class SessionPhase { Upcoming, StartingSoon, InProgress, Finished }
+
+// A row from "My Training History": a past mentoring session and whether its report is filed.
+data class TrainingRecord(
+    val id: String,
+    val position: String,
+    val date: String,
+    val mentor: String,
+    val status: String,
+    val reportUrl: String?,
+)
+
+data class SessionsState(
+    val feedUrl: String? = null,
+    val bookings: List<SessionBooking> = emptyList(),
+    val history: List<TrainingRecord> = emptyList(),
+    val historyAvailable: Boolean = true,
+    val lastChecked: Long? = null,
+    val message: String? = null,
+    val alerts: Boolean = true,
+    val remindMinutes: Int = 30,
+) {
+    fun upcoming(now: Long = System.currentTimeMillis()): List<SessionBooking> =
+        bookings.filter { it.end > now }.sortedBy { it.start }
+}
+
+val ReminderChoices = listOf(10, 15, 30, 60, 120)

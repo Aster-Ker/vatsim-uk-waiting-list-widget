@@ -3,6 +3,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Exact session reminders. USE_EXACT_ALARM is granted automatically on Android 13+. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
 
     <application
         android:name=".WaitingListApp"
@@ -25,6 +31,24 @@
             android:name=".ui.LoginActivity"
             android:exported="false"
             android:label="Sign in" />
+
+        <activity
+            android:name=".ui.WebPageActivity"
+            android:exported="false"
+            android:label="VATSIM UK" />
+
+        <receiver
+            android:name=".data.SessionAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".data.RescheduleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".widget.WaitingListWidget"
@@ -60,6 +84,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/positions_strip_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.NextSessionWidget"
+            android:exported="true"
+            android:label="@string/session_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/next_session_widget_info" />
         </receiver>
     </application>
 </manifest>

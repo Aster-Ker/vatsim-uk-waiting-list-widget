@@ -23,6 +23,16 @@ object Checker {
         }
         val previous = Store.state.value
 
+        // Bookings and training history use the same sign-in, so skip them when it has expired.
+        val sessions = if (result == FetchResult.LoginRequired) null else withContext(Dispatchers.IO) {
+            runCatching { SessionsSync.sync(app, previous.sessions) }.getOrNull()
+        }
+        if (sessions != null && !sessions.loginRequired) {
+            Store.update { it.copy(sessions = sessions.state) }
+            SessionReminders.reschedule(app, previous.sessions.bookings, sessions.state)
+            if (previous.sessions.alerts) sessions.notices.forEach { Notifications.showSessionUpdate(app, it) }
+        }
+
         when (result) {
             is FetchResult.Ok -> {
                 val (lists, changes) = merge(previous, result.lists)

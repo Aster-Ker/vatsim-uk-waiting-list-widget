@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Next session, 2×2 and up. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/kind"
+        android:layout_width="wrap_content"
+        android:layout_height="22dp"
+        android:background="@drawable/badge_info"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:text="Mentoring session"
+        android:textColor="@color/info_foreground"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/position"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:text="EGLL_GND"
+        android:textColor="@color/panel_foreground"
+        android:textSize="22sp" />
+
+    <TextView
+        android:id="@+id/time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="Tue 4 Nov, 18:00–19:30"
+        android:textColor="@color/panel_foreground"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/with"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/panel_muted"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/phase_live"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:textColor="@color/success_foreground"
+            android:textSize="12.5sp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/phase_soon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:textColor="@color/warning_foreground"
+            android:textSize="12.5sp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/phase_muted"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="In 2 days"
+            android:textColor="@color/panel_muted"
+            android:textSize="12.5sp" />
+    </LinearLayout>
+</LinearLayout>

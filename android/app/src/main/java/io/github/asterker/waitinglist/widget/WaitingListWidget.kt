@@ -14,10 +14,13 @@ import android.widget.RemoteViews
 import io.github.asterker.waitinglist.R
 import io.github.asterker.waitinglist.data.AppState
 import io.github.asterker.waitinglist.data.Scheduler
+import io.github.asterker.waitinglist.data.SessionPhase
+import io.github.asterker.waitinglist.data.SessionsSync
 import io.github.asterker.waitinglist.data.Status
 import io.github.asterker.waitinglist.data.Store
 import io.github.asterker.waitinglist.data.WaitingListEntry
 import io.github.asterker.waitinglist.ui.MainActivity
+import io.github.asterker.waitinglist.ui.relative
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -191,7 +194,12 @@ class WaitingListWidget : BaseWidget() {
     }
 
     companion object {
-        private val ALL = listOf(WaitingListWidget::class.java, BestPositionWidget::class.java, PositionsStripWidget::class.java)
+        private val ALL = listOf(
+            WaitingListWidget::class.java,
+            BestPositionWidget::class.java,
+            PositionsStripWidget::class.java,
+            NextSessionWidget::class.java,
+        )
 
         // Redraws every placed widget of every kind.
         fun updateAll(context: Context) {
@@ -261,5 +269,49 @@ class PositionsStripWidget : BaseWidget() {
             views.addView(R.id.items, item)
         }
         return views
+    }
+}
+
+// "Next session": your next booking with a starts-in / in-progress indicator.
+class NextSessionWidget : BaseWidget() {
+
+    override fun layouts(context: Context, state: AppState) = listOf(
+        SizeF(110f, 40f) to build(context, state, R.layout.widget_session_compact),
+        SizeF(170f, 100f) to build(context, state, R.layout.widget_session),
+    )
+
+    private fun build(context: Context, state: AppState, layout: Int): RemoteViews {
+        val views = RemoteViews(context.packageName, layout)
+        views.setOnClickPendingIntent(R.id.widget_root, openApp(context))
+        val now = System.currentTimeMillis()
+        val next = state.sessions.upcoming(now).firstOrNull()
+
+        if (next == null) {
+            views.setTextViewText(R.id.position, "No sessions")
+            views.setTextViewText(R.id.kind, "Next session")
+            views.setTextViewText(R.id.time, if (state.status == Status.LoginRequired) "Sign in needed" else "Nothing booked")
+            views.setTextViewText(R.id.with, "")
+            showPhase(views, R.id.phase_muted, "")
+            return views
+        }
+
+        views.setTextViewText(R.id.position, next.position ?: next.kind)
+        views.setTextViewText(R.id.kind, next.kind)
+        views.setTextViewText(R.id.time, SessionsSync.timeRange(next))
+        views.setTextViewText(R.id.with, next.withWhom ?: "")
+        when (next.phase(now, state.sessions.remindMinutes * 60_000L)) {
+            SessionPhase.InProgress -> showPhase(views, R.id.phase_live, "In progress · ends ${SessionsSync.time(next.end)}")
+            SessionPhase.StartingSoon -> showPhase(views, R.id.phase_soon, "Starts in ${relative(next.start - now)}")
+            SessionPhase.Upcoming -> showPhase(views, R.id.phase_muted, "In ${relative(next.start - now)}")
+            SessionPhase.Finished -> showPhase(views, R.id.phase_muted, "Finished")
+        }
+        return views
+    }
+
+    private fun showPhase(views: RemoteViews, id: Int, text: String) {
+        listOf(R.id.phase_live, R.id.phase_soon, R.id.phase_muted).forEach {
+            views.setViewVisibility(it, if (it == id) View.VISIBLE else View.GONE)
+        }
+        views.setTextViewText(id, text)
     }
 }

@@ -17,6 +17,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import io.github.asterker.waitinglist.R
 import io.github.asterker.waitinglist.ui.MainActivity
+import io.github.asterker.waitinglist.ui.WebPageActivity
 
 object Notifications {
     // Android fixes a channel's sound when it's created, so the loud channels have new IDs
@@ -25,6 +26,9 @@ object Notifications {
     private const val CHANNEL_SOUND = "position_sound"
     private const val OLD_CHANNEL_CHANGES = "position_changes"
     private const val CHANNEL_ACCOUNT = "account"
+    private const val CHANNEL_REMINDER_ALARM = "session_reminder_alarm"
+    private const val CHANNEL_REMINDER_SOUND = "session_reminder_sound"
+    private const val CHANNEL_SESSION_UPDATES = "session_updates"
     private const val ID_SIGN_IN = 1
     private var nextChangeId = 100
     private val VIBRATION = longArrayOf(0, 400, 200, 400, 200, 400)
@@ -53,6 +57,21 @@ object Notifications {
                     description = "Pops up with your notification sound when a waiting list position changes"
                     enableVibration(true)
                     vibrationPattern = VIBRATION
+                },
+                NotificationChannel(CHANNEL_REMINDER_ALARM, "Session reminders (alarm)", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Rings with your alarm sound before a booked session, even on silent"
+                    setSound(alarmSound, alarmAudio)
+                    enableVibration(true)
+                    vibrationPattern = VIBRATION
+                    enableLights(true)
+                },
+                NotificationChannel(CHANNEL_REMINDER_SOUND, "Session reminders", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Pops up with your notification sound before a booked session"
+                    enableVibration(true)
+                    vibrationPattern = VIBRATION
+                },
+                NotificationChannel(CHANNEL_SESSION_UPDATES, "Bookings and feedback", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "When a session is booked, moved or removed, and when a mentor files feedback"
                 },
                 NotificationChannel(CHANNEL_ACCOUNT, "Sign-in reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "When you need to sign in to vatsim.uk again"
@@ -104,6 +123,40 @@ object Notifications {
             .setAutoCancel(true)
         post(context, ID_SIGN_IN, builder)
     }
+
+    fun showSessionReminder(context: Context, booking: SessionBooking, minutesBefore: Int) {
+        val alarm = Store.state.value.alarmSound
+        val lead = if (minutesBefore < 60) "$minutesBefore minutes" else if (minutesBefore == 60) "1 hour" else "${minutesBefore / 60} hours"
+        val builder = NotificationCompat.Builder(context, if (alarm) CHANNEL_REMINDER_ALARM else CHANNEL_REMINDER_SOUND)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(if (alarm) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
+            .setContentTitle("${booking.title} in $lead")
+            .setContentText(listOfNotNull(SessionsSync.timeRange(booking), booking.withWhom).joinToString(" · "))
+            .setContentIntent(openApp(context))
+            .setAutoCancel(true)
+        post(context, booking.uid.hashCode(), builder)
+    }
+
+    fun showSessionUpdate(context: Context, notice: SessionsSync.Notice) {
+        val builder = NotificationCompat.Builder(context, CHANNEL_SESSION_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentTitle(notice.title)
+            .setContentText(notice.body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notice.body))
+            .setContentIntent(notice.url?.let { openPage(context, it) } ?: openApp(context))
+            .setAutoCancel(true)
+        post(context, nextChangeId++, builder)
+    }
+
+    // Opens a vatsim.uk page (a mentor report) inside the app, where you're already signed in.
+    private fun openPage(context: Context, url: String): PendingIntent = PendingIntent.getActivity(
+        context,
+        url.hashCode(),
+        WebPageActivity.intent(context, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     @SuppressLint("MissingPermission") // Checked by permissionGranted().
     private fun post(context: Context, id: Int, builder: NotificationCompat.Builder) {

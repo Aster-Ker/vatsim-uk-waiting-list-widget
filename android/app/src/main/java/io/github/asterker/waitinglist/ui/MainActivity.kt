@@ -8,6 +8,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.CalendarContract
+import android.widget.Toast
 import android.webkit.CookieManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,11 +20,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import io.github.asterker.waitinglist.data.Checker
 import io.github.asterker.waitinglist.data.Notifications
 import io.github.asterker.waitinglist.data.Scheduler
+import io.github.asterker.waitinglist.data.SessionReminders
 import io.github.asterker.waitinglist.data.Status
 import io.github.asterker.waitinglist.data.Store
 import io.github.asterker.waitinglist.data.WaitingListClient
@@ -78,6 +86,35 @@ private fun App() {
         }
     }
 
+    var showSessions by rememberSaveable { mutableStateOf(false) }
+    if (showSessions) {
+        val now by produceState(System.currentTimeMillis()) {
+            while (true) {
+                delay(30_000)
+                value = System.currentTimeMillis()
+            }
+        }
+        SessionsScreen(
+            sessions = state.sessions,
+            now = now,
+            onBack = { showSessions = false },
+            onOpenPage = { url -> context.startActivity(WebPageActivity.intent(context, url)) },
+            onAddToCalendar = { booking ->
+                val intent = Intent(Intent.ACTION_INSERT)
+                    .setData(CalendarContract.Events.CONTENT_URI)
+                    .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, booking.start)
+                    .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, booking.end)
+                    .putExtra(CalendarContract.Events.TITLE, booking.title)
+                    .putExtra(CalendarContract.Events.EVENT_LOCATION, booking.position ?: "")
+                    .putExtra(CalendarContract.Events.DESCRIPTION, listOfNotNull(booking.withWhom, booking.url).joinToString("\n"))
+                runCatching { context.startActivity(intent) }.onFailure {
+                    Toast.makeText(context, "No calendar app found", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+        return
+    }
+
     val widgetManager = AppWidgetManager.getInstance(context)
     MainScreen(
         state = state,
@@ -110,6 +147,17 @@ private fun App() {
         onPinWidget = {
             widgetManager.requestPinAppWidget(ComponentName(context, WaitingListWidget::class.java), null, null)
         },
+        onOpenPage = { url -> context.startActivity(WebPageActivity.intent(context, url)) },
+        onSessionAlertsChange = { enabled ->
+            Store.update { it.copy(sessions = it.sessions.copy(alerts = enabled)) }
+            SessionReminders.reschedule(context, state.sessions.bookings, Store.state.value.sessions)
+            if (enabled) requestNotificationPermission()
+        },
+        onRemindChange = { minutes ->
+            Store.update { it.copy(sessions = it.sessions.copy(remindMinutes = minutes)) }
+            SessionReminders.reschedule(context, state.sessions.bookings, Store.state.value.sessions)
+        },
+        onShowAllSessions = { showSessions = true },
         onSignOut = {
             CookieManager.getInstance().removeAllCookies(null)
             CookieManager.getInstance().flush()

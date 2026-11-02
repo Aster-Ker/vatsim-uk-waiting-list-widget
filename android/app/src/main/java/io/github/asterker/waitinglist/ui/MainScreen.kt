@@ -21,6 +21,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.asterker.waitinglist.data.AppState
 import io.github.asterker.waitinglist.data.IntervalChoices
+import io.github.asterker.waitinglist.data.ReminderChoices
 import io.github.asterker.waitinglist.data.Status
 import io.github.asterker.waitinglist.data.WaitingListEntry
 import io.github.asterker.waitinglist.data.formatInterval
@@ -50,8 +54,19 @@ fun MainScreen(
     onTestNotification: () -> Unit,
     onPinWidget: () -> Unit,
     onSignOut: () -> Unit,
+    onOpenPage: (String) -> Unit,
+    onSessionAlertsChange: (Boolean) -> Unit,
+    onRemindChange: (Int) -> Unit,
+    onShowAllSessions: () -> Unit,
 ) {
     val c = LocalPanel.current
+    // Ticks so countdowns stay current while the screen is open.
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(30_000)
+            value = System.currentTimeMillis()
+        }
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -63,11 +78,17 @@ fun MainScreen(
         Header(state)
         Spacer(Modifier.height(16.dp))
 
+        if (state.status == Status.LoginRequired) {
+            PanelAlert(c.warning, "Sign in needed", "Your vatsim.uk session has expired.", "Sign in", onSignIn)
+            Spacer(Modifier.height(12.dp))
+        }
+
+        SessionsSection(state.sessions, now, onOpenPage, onShowAllSessions)
+
+        Spacer(Modifier.height(24.dp))
+        SectionLabel("Waiting lists")
+
         when (state.status) {
-            Status.LoginRequired -> {
-                PanelAlert(c.warning, "Sign in needed", "Your vatsim.uk session has expired.", "Sign in", onSignIn)
-                Spacer(Modifier.height(12.dp))
-            }
             Status.Error -> if (!state.checking) {
                 PanelAlert(c.destructive, "Couldn't check vatsim.uk", state.message ?: "Something went wrong.", "Retry", onCheckNow)
                 Spacer(Modifier.height(12.dp))
@@ -141,6 +162,32 @@ fun MainScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+        SectionLabel("Session reminders")
+        PanelCard {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Session alerts", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        "A reminder before each booked session, plus alerts when bookings change or a mentor files feedback",
+                        color = c.muted,
+                        fontSize = 12.5.sp,
+                    )
+                }
+                PanelSwitch(state.sessions.alerts, onSessionAlertsChange)
+            }
+            Divider()
+            Column(Modifier.padding(16.dp)) {
+                Text("Remind me before a session", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(10.dp))
+                Segmented(
+                    options = ReminderChoices.map { if (it < 60) "${it}m" else "${it / 60}h" },
+                    selected = ReminderChoices.indexOf(state.sessions.remindMinutes).coerceAtLeast(0),
+                    onSelect = { onRemindChange(ReminderChoices[it]) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
         SectionLabel("Check every")
         val selected = IntervalChoices.indexOf(state.intervalMinutes).coerceAtLeast(0)
         Segmented(
@@ -149,7 +196,7 @@ fun MainScreen(
             onSelect = { onIntervalChange(IntervalChoices[it]) },
         )
         Text(
-            "VATSIM UK updates waiting lists about once a day, so hourly is plenty.",
+            "Applies to waiting lists, bookings and feedback. Reminder alarms are set separately, so they ring on time.",
             color = c.muted,
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, top = 8.dp),
@@ -210,8 +257,8 @@ private fun Header(state: AppState) {
     val c = LocalPanel.current
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
         Column(Modifier.weight(1f)) {
-            Text("Waiting lists", color = c.foreground, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-            Text("VATSIM UK", color = c.muted, fontSize = 14.sp)
+            Text("VATSIM UK", color = c.foreground, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text("Training and waiting lists", color = c.muted, fontSize = 14.sp)
         }
         when {
             state.checking -> RoleBadge("Checking", c.info, dot = true)
