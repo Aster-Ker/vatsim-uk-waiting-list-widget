@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.RemoteViews
 import io.github.asterker.waitinglist.R
 import io.github.asterker.waitinglist.data.AppState
+import io.github.asterker.waitinglist.data.Estimate
 import io.github.asterker.waitinglist.data.Scheduler
 import io.github.asterker.waitinglist.data.SessionPhase
 import io.github.asterker.waitinglist.data.SessionsSync
@@ -184,6 +185,11 @@ class WaitingListWidget : BaseWidget() {
         views.setTextViewText(R.id.name, entry.name)
         val details = buildList {
             add(entry.department)
+            when (val estimate = Estimate.of(entry)) {
+                is Estimate.Ready -> add("${Estimate.formatShort(estimate.days)} to #1")
+                Estimate.Next -> add("You're next")
+                else -> Unit
+            }
             entry.theoryPassed?.let { add(if (it) "Theory ✓" else "Theory ✗") }
             if (entry.joined.isNotEmpty()) add("Joined ${entry.joined}")
         }

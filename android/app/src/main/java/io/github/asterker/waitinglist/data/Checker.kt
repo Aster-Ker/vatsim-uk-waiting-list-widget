@@ -73,10 +73,14 @@ object Checker {
             val before = old.remove(entry.key)
             if (before == null) {
                 if (!firstCheck) changes += "Added to ${entry.name}" + (entry.position?.let { " at #$it" } ?: "")
-                return@map entry
+                return@map entry.copy(history = Estimate.record(emptyList(), entry.position, now))
             }
 
-            var result = entry.copy(change = before.change, changedAt = before.changedAt)
+            var result = entry.copy(
+                change = before.change,
+                changedAt = before.changedAt,
+                history = Estimate.record(before.history, entry.position, now),
+            )
             val was = before.position
             val current = entry.position
             if (was != null && current != null && was != current) {

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.asterker.waitinglist.data.AppState
+import io.github.asterker.waitinglist.data.Estimate
 import io.github.asterker.waitinglist.data.IntervalChoices
 import io.github.asterker.waitinglist.data.ReminderChoices
 import io.github.asterker.waitinglist.data.SessionBooking
@@ -59,6 +62,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 // Everything the pages can ask the activity to do.
 class Actions(
@@ -384,6 +388,26 @@ private fun PanelSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, en
     )
 }
 
+// "About 3 months to #1 · moving ~4 places a month", or why there's no estimate yet.
+@Composable
+private fun EstimateLine(entry: WaitingListEntry) {
+    val c = LocalPanel.current
+    val (text, colour) = when (val estimate = Estimate.of(entry)) {
+        null -> return
+        Estimate.Next -> "You're next for a training place" to c.success.foreground
+        Estimate.Stalled -> "No movement lately, so no estimate yet" to c.muted
+        is Estimate.Gathering ->
+            "Estimate after a week or two of tracking (since ${SimpleDateFormat("d MMM", Locale.UK).format(Date(estimate.since))})" to c.muted
+        is Estimate.Ready -> {
+            val pace = estimate.placesPerMonth
+            val paceText = if (pace >= 1.5) "moving ~${pace.roundToInt()} places a month" else "moving ~1 place a month"
+            "${Estimate.formatDays(estimate.days).replaceFirstChar { it.uppercase() }} to #1 · $paceText" to c.info.foreground
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(text, color = colour, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+}
+
 @Composable
 private fun ListRow(entry: WaitingListEntry) {
     val c = LocalPanel.current
@@ -392,13 +416,14 @@ private fun ListRow(entry: WaitingListEntry) {
     Row(
         Modifier
             .fillMaxWidth()
+            .height(IntrinsicSize.Min)
             .then(if (recent) Modifier.background(highlight.tint) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
                 .width(3.dp)
-                .height(64.dp)
+                .fillMaxHeight()
                 .background(if (recent) highlight.solid else c.card.copy(alpha = 0f))
         )
         Row(
@@ -423,6 +448,7 @@ private fun ListRow(entry: WaitingListEntry) {
                         )
                     }
                 }
+                EstimateLine(entry)
             }
             Spacer(Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End) {

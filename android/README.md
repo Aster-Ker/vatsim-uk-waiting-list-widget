@@ -29,6 +29,7 @@ The app has three pages. Swipe left or right to move between them, or tap the ba
 
 
 - Lists every ATC and pilot waiting list you're on: position, ▲/▼ for the last change, join date and theory exam status
+- **Estimated time to #1** for each waiting list, from how fast your position has moved (see below)
 - Notifies you when a position moves, you're added to or removed from a list, a theory exam passes, or you need to sign in again
 - Position alerts pop up, vibrate and ring with your alarm sound, even on silent. Turn off **Alarm sound** in the app to use your normal notification sound instead; **Sound settings** opens Android's settings for that alert.
 - Highlights lists that moved in the last 24 hours
@@ -47,6 +48,13 @@ The app has three pages. Swipe left or right to move between them, or tap the ba
   - **Positions strip**: a 4×1 row with 2–5 lists side by side, depending on width
   - **Waiting lists**: a full list with a refresh button, showing 1–6 rows depending on height
 - Light and dark themes styled after [PanelUI](https://panelui.dev), following your phone's setting
+
+## Estimated time to #1
+
+VATSIM UK doesn't publish how fast each list moves, so the estimate comes from your own position history. The app
+records your position each time it changes and works out your pace over the last six months, including weeks with no
+movement. For example: "About 3 months to #1 · ~4 places a month". It needs about a week of tracking with some
+movement before the first estimate appears, and it's only a guide: lists can speed up or slow down.
 
 ## Build
 

@@ -32,6 +32,13 @@ The UI follows the default "Panel" theme of [PanelUI](https://panelui.dev): neut
 borders, tinted status badges, and KPI-style position numbers. It switches between light and dark
 with Windows (right-click → Theme to force one). It uses Inter if you have it installed, otherwise Segoe UI.
 
+## Estimated time to #1
+
+Each waiting list shows an estimate of how long until you reach #1. VATSIM UK doesn't publish how fast each list moves, so the estimate comes from your own position history. The app
+records your position each time it changes and works out your pace over the last six months, including weeks with no
+movement. For example: "About 3 months to #1 · ~4 places a month". It needs about a week of tracking with some
+movement before the first estimate appears, and it's only a guide: lists can speed up or slow down.
+
 ## Sessions
 
 The widget also shows your next three bookings from vatsim.uk: ATC bookings, mentoring sessions and exams. It finds your

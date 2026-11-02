@@ -17,7 +17,16 @@ sealed class WaitingListEntry
     // When that change was seen, so recently moved lists can be highlighted.
     public DateTime? ChangedAt { get; set; }
 
+    // Your position each time it changed, oldest first, for the time estimate.
+    public List<PositionSample> History { get; set; } = new();
+
     public string Key => $"{Department}|{Name}";
+}
+
+sealed class PositionSample
+{
+    public DateTime At { get; set; }
+    public int Position { get; set; }
 }
 
 // A booking from the member's vatsim.uk calendar feed: ATC booking, mentoring session or exam.

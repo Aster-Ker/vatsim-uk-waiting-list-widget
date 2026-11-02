@@ -17,7 +17,7 @@ sealed class WidgetForm : Form
     const int WidgetWidth = 340;
     const int Pad = 16;
     const int HeaderHeight = 58;
-    const int RowHeight = 60;
+    const int RowHeight = 78;
     const int FooterHeight = 40;
     const int AlertHeight = 78;
     const int SectionLabelHeight = 28;
@@ -251,6 +251,7 @@ sealed class WidgetForm : Form
         {
             if (!old.TryGetValue(entry.Key, out var before))
             {
+                Estimate.Record(entry, DateTime.UtcNow);
                 if (!firstCheck)
                     changes.Add($"Added to {entry.Name}" + (entry.Position is int p ? $" at #{p}" : ""));
                 continue;
@@ -259,6 +260,8 @@ sealed class WidgetForm : Form
             old.Remove(entry.Key);
             entry.Change = before.Change;
             entry.ChangedAt = before.ChangedAt;
+            entry.History = before.History;
+            Estimate.Record(entry, DateTime.UtcNow);
             if (before.Position is int was && entry.Position is int now && was != now)
             {
                 entry.Change = was - now;
@@ -517,7 +520,23 @@ sealed class WidgetForm : Form
             TextRenderer.DrawText(g, "Joined " + list.Joined, smallFont, new Rectangle(x, centerY - S(10), textRight - x, S(20)),
                 theme.MutedForeground, TextFormatFlags.VerticalCenter | SingleLineText);
         }
+
+        // Third line: how long until #1 at your current pace, or why there's no estimate yet.
+        (string? text, Color colour) estimate = Estimate.Of(list, DateTime.UtcNow) switch
+        {
+            Estimate.Next => ("You're next for a training place", theme.Success.Foreground),
+            Estimate.Stalled => ("No movement lately, so no estimate yet", theme.MutedForeground),
+            Estimate.Gathering e => ($"Estimate after a week or two of tracking (since {e.Since.ToLocalTime():d MMM})", theme.MutedForeground),
+            Estimate.Ready e => ($"{Capitalise(Estimate.FormatDays(e.Days))} to #1 · ~{Math.Max(1, Math.Round(e.PlacesPerMonth))} places a month", theme.Info.Foreground),
+            _ => (null, theme.MutedForeground),
+        };
+        if (estimate.text != null)
+        {
+            TextRenderer.DrawText(g, estimate.text, smallFont, new Rectangle(pad, r.Top + S(56), right - pad, S(18)), estimate.colour, SingleLineText);
+        }
     }
+
+    static string Capitalise(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
     Rectangle DrawBadge(Graphics g, string text, Color foreground, Color background, int x, int centerY, bool alignRight = false, Color? dot = null)
     {

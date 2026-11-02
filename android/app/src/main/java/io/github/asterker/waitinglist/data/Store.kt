@@ -39,6 +39,12 @@ object Store {
                     theoryPassed = o.boolOrNull("theoryPassed"),
                     change = o.intOrNull("change"),
                     changedAt = o.longOrNull("changedAt"),
+                    history = o.optJSONArray("history")?.let { h ->
+                        (0 until h.length()).map { j ->
+                            val sample = h.getJSONObject(j)
+                            PositionSample(sample.getLong("at"), sample.getInt("position"))
+                        }
+                    } ?: emptyList(),
                 )
             }
         }.getOrDefault(emptyList())
@@ -67,6 +73,9 @@ object Store {
                 putOpt("theoryPassed", e.theoryPassed)
                 putOpt("change", e.change)
                 putOpt("changedAt", e.changedAt)
+                put("history", JSONArray().apply {
+                    e.history.forEach { put(JSONObject().put("at", it.at).put("position", it.position)) }
+                })
             })
         }
         prefs.edit()

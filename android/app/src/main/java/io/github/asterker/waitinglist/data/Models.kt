@@ -11,6 +11,8 @@ data class WaitingListEntry(
     val change: Int? = null,
     // When that change was seen, so recently moved lists can be highlighted.
     val changedAt: Long? = null,
+    // Your position each time it changed, oldest first, for the time estimate.
+    val history: List<PositionSample> = emptyList(),
 ) {
     val key: String get() = "$department|$name"
 
@@ -21,6 +23,8 @@ data class WaitingListEntry(
         const val HIGHLIGHT_MILLIS = 24L * 60 * 60 * 1000
     }
 }
+
+data class PositionSample(val at: Long, val position: Int)
 
 enum class Status { Idle, Ok, LoginRequired, Error }
 
