@@ -1,4 +1,4 @@
-Track your VATSIM UK waiting list positions on Android and Windows, with alerts when they change.
+Track your VATSIM UK training sessions and waiting list positions on Android and Windows.
 
 ## Downloads
 
@@ -7,27 +7,36 @@ Track your VATSIM UK waiting list positions on Android and Windows, with alerts 
 | **Android** app and home screen widgets | `UKWaitingLists.apk` | Android 8.0 or later |
 | **Windows** desktop widget | `WaitingListWidget-win-x64.zip` | Windows 10 (1809+) or 11, 64-bit |
 
-## New: Android app
+## New: training sessions
 
-- Shows every ATC and pilot waiting list you're on: position, ▲/▼ for the latest change, join date and theory exam status
-- **Alarm alerts** when a position changes: pops up, vibrates and rings with your alarm sound, even on silent (switchable to your normal notification sound)
-- Checks in the background every 15 minutes to 6 hours (default: 1 hour)
-- Three resizable home screen widgets:
-  - **Best position**: 1×1 tile up to a 2×2 card
-  - **Positions strip**: 2–5 lists side by side in a 4×1 row
-  - **Waiting lists**: full list with 1–6 rows and a refresh button
-- Light and dark themes styled after [PanelUI](https://panelui.dev)
+Both apps now read your bookings, mentoring sessions and exams from vatsim.uk. Your personal calendar link is found
+on the vatsim.uk dashboard automatically, so there's nothing to set up.
 
-**Install:** download `UKWaitingLists.apk` on your phone, open it and allow installing from your browser or Files app when Android asks. Future versions install over this one and keep your sign-in.
+- **Session indicator:** your next session with a countdown: upcoming, starting soon or in progress
+- **Reminder alarm** before each session: 10 minutes to 2 hours, default 30 minutes
+- **Booking alerts** when a session is booked, moved or removed
+- **Mentor feedback:** a notification when your mentor files the report, from My Training History; tap to read it
 
-## Windows widget
+On Android there's also an **All sessions** screen (upcoming by day, past with report status, add to calendar) and a
+**Next session** home screen widget. On Windows the widget shows your next three sessions, and reminders stay on
+screen until dismissed.
 
-Unchanged from v1.1.0: always-on-top widget with Windows notifications, light/dark theme and start-with-Windows. Unzip and run `WaitingListWidget.exe`. If SmartScreen warns you, choose **More info → Run anyway**.
+## Also included
+
+- Waiting list positions with ▲/▼ changes, join dates and theory exam status
+- Alerts when a position changes, with the alarm sound on Android
+- Android home screen widgets: Best position, Positions strip, Waiting lists and Next session
+
+**Android install:** download `UKWaitingLists.apk` on your phone, open it and allow installing when Android asks.
+It installs over earlier versions and keeps your sign-in.
+
+**Windows install:** unzip and run `WaitingListWidget.exe`. If SmartScreen warns you, choose **More info → Run anyway**.
 
 ## Sign-in and privacy
 
-Both apps read the same page you see at vatsim.uk/mship/waiting-lists. You sign in with VATSIM in a built-in browser window; the apps never see or store your password. Your login and settings stay on your device.
+Both apps read the same pages you see on vatsim.uk. You sign in with VATSIM in a built-in browser window; the apps
+never see or store your password. Your login, calendar link and settings stay on your device.
 
 ---
 
-Unofficial tool. Not affiliated with VATSIM or VATSIM UK. VATSIM UK updates waiting lists about once a day, so checking more often than hourly gains little.
+Unofficial tool. Not affiliated with VATSIM or VATSIM UK.

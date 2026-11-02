@@ -20,6 +20,10 @@ sealed class WidgetForm : Form
     const int RowHeight = 60;
     const int FooterHeight = 40;
     const int AlertHeight = 78;
+    const int SectionLabelHeight = 28;
+    const int SessionRowHeight = 50;
+    const int MaxSessionRows = 3;
+    static readonly int[] ReminderChoices = { 10, 15, 30, 60, 120 };
 
     const TextFormatFlags SingleLineText = TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine;
 
@@ -29,6 +33,9 @@ sealed class WidgetForm : Form
     readonly ContextMenuStrip menu = new();
     readonly ToolTip toolTip = new();
     readonly System.Windows.Forms.Timer timer = new();
+    // Ticks every 30 seconds for countdowns and session reminders.
+    readonly System.Windows.Forms.Timer clock = new() { Interval = 30_000 };
+    readonly List<(Rectangle Bounds, string Url)> sessionLinks = new();
     readonly Font titleFont, nameFont, smallFont, badgeFont, positionFont, deltaFont;
 
     Theme theme;
@@ -74,10 +81,22 @@ sealed class WidgetForm : Form
         tray.BalloonTipClicked += (_, _) => SetWidgetVisible(true);
 
         Notifier.Init();
-        Notifier.Clicked += () =>
+        Notifier.Clicked += url =>
         {
-            if (IsHandleCreated)
-                BeginInvoke(() => SetWidgetVisible(true));
+            if (!IsHandleCreated)
+                return;
+            BeginInvoke(() =>
+            {
+                if (url != null)
+                    OpenUrl(url);
+                else
+                    SetWidgetVisible(true);
+            });
+        };
+        clock.Tick += (_, _) =>
+        {
+            CheckReminders();
+            Invalidate();
         };
 
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
@@ -105,6 +124,7 @@ sealed class WidgetForm : Form
 
         timer.Interval = state.IntervalMinutes * 60_000;
         timer.Start();
+        clock.Start();
         // First run: open the sign-in window straight away rather than waiting for a failed check.
         await RefreshAsync(state.LastChecked == null);
     }
@@ -133,8 +153,60 @@ sealed class WidgetForm : Form
         {
             result = FetchResult.Fail(ex.Message);
         }
+        // Bookings and training history use the same sign-in, so skip them when it has expired.
+        if (result.Status != FetchStatus.LoginRequired)
+        {
+            try
+            {
+                var sessions = await SessionsService.SyncAsync(browser, state.Sessions);
+                if (!sessions.LoginRequired)
+                {
+                    state.Sessions = sessions.State;
+                    if (state.Sessions.Alerts)
+                    {
+                        foreach (var notice in sessions.Notices)
+                            Notifier.Show(tray, notice.Title, notice.Body, url: notice.Url);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                state.Sessions.Message = "Couldn't check sessions: " + ex.Message;
+            }
+        }
+
         busy = false;
         Apply(result);
+        CheckReminders();
+    }
+
+    // Pops up an alarm reminder once per session, the chosen number of minutes before it starts.
+    void CheckReminders()
+    {
+        var sessions = state.Sessions;
+        if (!sessions.Alerts)
+            return;
+        var now = DateTime.UtcNow;
+        foreach (var booking in sessions.Upcoming(now))
+        {
+            if (sessions.Reminded.Contains(booking.Uid) || now < booking.Start.AddMinutes(-sessions.RemindMinutes) || now >= booking.Start)
+                continue;
+            sessions.Reminded.Add(booking.Uid);
+            Notifier.ShowReminder(tray, $"{booking.Title} in {Relative(booking.Start - now)}",
+                string.Join(" · ", new[] { booking.TimeRange, booking.WithWhom }.Where(s => s != null)));
+        }
+        state.Save();
+    }
+
+    static string Relative(TimeSpan span)
+    {
+        int minutes = (int)Math.Ceiling(Math.Max(0, span.TotalMinutes));
+        if (minutes < 60)
+            return $"{minutes} min";
+        if (minutes < 24 * 60)
+            return minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes / 60} h {minutes % 60} min";
+        int days = minutes / (24 * 60);
+        return days == 1 ? "1 day" : $"{days} days";
     }
 
     void Apply(FetchResult result)
@@ -273,7 +345,9 @@ sealed class WidgetForm : Form
     void UpdateLayoutSize()
     {
         int rows = Math.Max(1, state.Lists.Count);
-        int height = S(HeaderHeight + rows * RowHeight + (ShowsAlert ? AlertHeight : FooterHeight));
+        int sessionRows = Math.Max(1, Math.Min(MaxSessionRows, state.Sessions.Upcoming(DateTime.UtcNow).Count));
+        int height = S(HeaderHeight + 2 * SectionLabelHeight + sessionRows * SessionRowHeight + rows * RowHeight
+            + (ShowsAlert ? AlertHeight : FooterHeight));
         if (ClientSize.Height != height)
             ClientSize = new Size(ClientSize.Width, height);
         Region = nativeCorners ? null : new Region(RoundedPath(new Rectangle(Point.Empty, ClientSize), S(12)));
@@ -289,14 +363,18 @@ sealed class WidgetForm : Form
         int pad = S(Pad);
 
         // Header: title, subtitle and a status badge, like a PanelUI card header.
-        TextRenderer.DrawText(g, "Waiting lists", titleFont, new Point(pad, S(12)), theme.Foreground, TextFormatFlags.NoPadding);
-        TextRenderer.DrawText(g, "VATSIM UK", smallFont, new Point(pad, S(34)), theme.MutedForeground, TextFormatFlags.NoPadding);
+        TextRenderer.DrawText(g, "VATSIM UK", titleFont, new Point(pad, S(12)), theme.Foreground, TextFormatFlags.NoPadding);
+        TextRenderer.DrawText(g, "Training and waiting lists", smallFont, new Point(pad, S(34)), theme.MutedForeground, TextFormatFlags.NoPadding);
         var (badgeText, badgeRole) = StatusBadge();
         DrawBadge(g, badgeText, badgeRole.Foreground, badgeRole.Tint, width - pad, S(HeaderHeight / 2), alignRight: true, dot: badgeRole.Solid);
 
         int y = S(HeaderHeight);
         using var divider = new Pen(theme.Border);
         g.DrawLine(divider, 0, y, width, y);
+
+        y = DrawSessions(g, y, width, divider);
+        DrawSectionLabel(g, "WAITING LISTS", new Rectangle(pad, y, width - 2 * pad, S(SectionLabelHeight)));
+        y += S(SectionLabelHeight);
 
         if (state.Lists.Count == 0)
         {
@@ -326,6 +404,57 @@ sealed class WidgetForm : Form
             using var outline = RoundedPath(new Rectangle(0, 0, width - 1, ClientSize.Height - 1), S(12));
             g.DrawPath(border, outline);
         }
+    }
+
+    void DrawSectionLabel(Graphics g, string text, Rectangle r) =>
+        TextRenderer.DrawText(g, text, badgeFont, new Rectangle(r.Left, r.Top + S(10), r.Width, r.Height - S(10)), theme.MutedForeground,
+            TextFormatFlags.Top | SingleLineText);
+
+    // The next few bookings with a starts-in / in-progress badge. Clicking one opens it on vatsim.uk.
+    int DrawSessions(Graphics g, int y, int width, Pen divider)
+    {
+        int pad = S(Pad);
+        sessionLinks.Clear();
+        DrawSectionLabel(g, "NEXT SESSIONS", new Rectangle(pad, y, width - 2 * pad, S(SectionLabelHeight)));
+        y += S(SectionLabelHeight);
+
+        var now = DateTime.UtcNow;
+        var upcoming = state.Sessions.Upcoming(now).Take(MaxSessionRows).ToList();
+        if (upcoming.Count == 0)
+        {
+            string text = state.Sessions.FeedUrl == null && state.Sessions.Message != null ? state.Sessions.Message
+                : state.Sessions.LastChecked == null ? "Checking your bookings…"
+                : "No upcoming bookings.";
+            TextRenderer.DrawText(g, text, smallFont, new Rectangle(pad, y, width - 2 * pad, S(SessionRowHeight)), theme.MutedForeground,
+                TextFormatFlags.VerticalCenter | SingleLineText);
+            y += S(SessionRowHeight);
+            g.DrawLine(divider, 0, y, width, y);
+            return y;
+        }
+
+        foreach (var booking in upcoming)
+        {
+            var r = new Rectangle(0, y + 1, width, S(SessionRowHeight) - 1);
+            var (badge, role) = now >= booking.Start ? ($"Live · ends {booking.End.ToLocalTime():HH:mm}", theme.Success)
+                : now >= booking.Start.AddMinutes(-state.Sessions.RemindMinutes) ? ($"in {Relative(booking.Start - now)}", theme.Warning)
+                : ($"in {Relative(booking.Start - now)}", theme.Info);
+            if (role == theme.Success || role == theme.Warning)
+            {
+                using var tint = new SolidBrush(role.Tint);
+                g.FillRectangle(tint, r);
+            }
+            var badgeRect = DrawBadge(g, badge, role.Foreground, role == theme.Info ? theme.Secondary : role.Tint,
+                r.Right - pad, r.Top + r.Height / 2, alignRight: true, dot: role == theme.Info ? null : role.Solid);
+            int textWidth = badgeRect.Left - pad - S(8);
+            TextRenderer.DrawText(g, booking.Position ?? booking.Kind, nameFont, new Rectangle(pad, r.Top + S(7), textWidth, S(20)), theme.Foreground, SingleLineText);
+            TextRenderer.DrawText(g, $"{booking.Kind} · {booking.Start.ToLocalTime():ddd HH:mm}–{booking.End.ToLocalTime():HH:mm}", smallFont,
+                new Rectangle(pad, r.Top + S(27), textWidth, S(18)), theme.MutedForeground, SingleLineText);
+            if (booking.Url != null)
+                sessionLinks.Add((r, booking.Url));
+            y += S(SessionRowHeight);
+            g.DrawLine(divider, 0, y, width, y);
+        }
+        return y;
     }
 
     (string, Theme.Role) StatusBadge()
@@ -570,7 +699,35 @@ sealed class WidgetForm : Form
 
         var startupItem = new ToolStripMenuItem("Start with Windows", null, (_, _) => SetStartWithWindows(!StartsWithWindows()));
 
-        menu.Items.AddRange(new ToolStripItem[] { showItem, topItem, themeMenu, intervalMenu, notifyMenu, startupItem, new ToolStripSeparator() });
+        var sessionsMenu = new ToolStripMenuItem("Sessions");
+        var alertsItem = new ToolStripMenuItem("Session alerts (reminders, booking changes, feedback)", null, (_, _) =>
+        {
+            state.Sessions.Alerts = !state.Sessions.Alerts;
+            state.Save();
+        });
+        var remindMenu = new ToolStripMenuItem("Remind me before");
+        foreach (int minutes in ReminderChoices)
+        {
+            remindMenu.DropDownItems.Add(new ToolStripMenuItem(minutes < 60 ? $"{minutes} min" : minutes == 60 ? "1 hour" : $"{minutes / 60} hours", null, (_, _) =>
+            {
+                state.Sessions.RemindMinutes = minutes;
+                state.Save();
+                Invalidate();
+            }) { Tag = minutes });
+        }
+        sessionsMenu.DropDownItems.Add(alertsItem);
+        sessionsMenu.DropDownItems.Add(remindMenu);
+        sessionsMenu.DropDownItems.Add(new ToolStripSeparator());
+        sessionsMenu.DropDownItems.Add("Open My Training History", null, (_, _) => OpenUrl(SessionsService.HistoryUrl));
+        sessionsMenu.DropDownItems.Add("Open bookings calendar", null, (_, _) => OpenUrl("https://www.vatsim.uk/calendar"));
+        menu.Opening += (_, _) =>
+        {
+            alertsItem.Checked = state.Sessions.Alerts;
+            foreach (ToolStripMenuItem item in remindMenu.DropDownItems)
+                item.Checked = (int)item.Tag! == state.Sessions.RemindMinutes;
+        };
+
+        menu.Items.AddRange(new ToolStripItem[] { showItem, topItem, themeMenu, intervalMenu, notifyMenu, sessionsMenu, startupItem, new ToolStripSeparator() });
         menu.Items.Add("Sign out", null, (_, _) =>
         {
             browser.SignOut();
@@ -608,8 +765,10 @@ sealed class WidgetForm : Form
             key.DeleteValue(RunValue, false);
     }
 
-    static void OpenInBrowser() =>
-        Process.Start(new ProcessStartInfo(BrowserForm.WaitingListsUrl) { UseShellExecute = true });
+    static void OpenInBrowser() => OpenUrl(BrowserForm.WaitingListsUrl);
+
+    static void OpenUrl(string url) =>
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 
     void SetWidgetVisible(bool visible)
     {
@@ -658,7 +817,7 @@ sealed class WidgetForm : Form
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        Cursor = alertButton.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
+        Cursor = alertButton.Contains(e.Location) || sessionLinks.Any(l => l.Bounds.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
         if (pressPoint is not Point origin)
             return;
         if (!dragging && Math.Abs(e.X - origin.X) + Math.Abs(e.Y - origin.Y) < S(4))
@@ -684,12 +843,16 @@ sealed class WidgetForm : Form
         {
             await RefreshAsync(status == FetchStatus.LoginRequired);
         }
+        else if (sessionLinks.FirstOrDefault(l => l.Bounds.Contains(e.Location)) is { Url: not null } link)
+        {
+            OpenUrl(link.Url);
+        }
     }
 
     protected override async void OnMouseDoubleClick(MouseEventArgs e)
     {
         base.OnMouseDoubleClick(e);
-        if (alertButton.Contains(e.Location))
+        if (alertButton.Contains(e.Location) || sessionLinks.Any(l => l.Bounds.Contains(e.Location)))
             return;
         if (status == FetchStatus.LoginRequired)
             await RefreshAsync(true);
@@ -752,6 +915,7 @@ sealed class WidgetForm : Form
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
             tray.Dispose();
             timer.Dispose();
+            clock.Dispose();
             toolTip.Dispose();
             browser.Dispose();
             trayIcon?.Dispose();

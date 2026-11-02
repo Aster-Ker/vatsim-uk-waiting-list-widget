@@ -32,6 +32,19 @@ The UI follows the default "Panel" theme of [PanelUI](https://panelui.dev): neut
 borders, tinted status badges, and KPI-style position numbers. It switches between light and dark
 with Windows (right-click → Theme to force one). It uses Inter if you have it installed, otherwise Segoe UI.
 
+## Sessions
+
+The widget also shows your next three bookings from vatsim.uk: ATC bookings, mentoring sessions and exams. It finds your
+personal calendar link on the vatsim.uk dashboard (under **Calendar subscription**) by itself.
+
+- Each session shows a badge: **in 2 days**, **in 25 min** (amber, inside your reminder window) or **Live** (green).
+  Click a session to open it on vatsim.uk.
+- A reminder pops up before each session with the alarm sound and stays on screen until you dismiss it.
+  Right-click → **Sessions → Remind me before** sets how early: 10 minutes to 2 hours, default 30 minutes.
+- You're notified when a session is booked, moved or removed, and when your mentor files feedback. That's read from
+  **My Training History** on vatsim.uk; clicking the notification opens the report.
+- Right-click → **Sessions** also turns these alerts off, and opens My Training History or the bookings calendar.
+
 ## Notifications
 
 When a check finds a change, you get a Windows notification. The notification also stays in the notification centre. You're notified when:

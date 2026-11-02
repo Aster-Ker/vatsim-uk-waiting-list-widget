@@ -68,7 +68,14 @@ sealed class BrowserForm : Form
         TextAlign = ContentAlignment.MiddleLeft,
         Text = "Sign in with your VATSIM account. This window closes by itself once your waiting lists load.",
     };
-    TaskCompletionSource<FetchResult>? pending;
+    // A page to load and the script that reads it. Pages other than IsTarget mean the session has expired.
+    public sealed record PageJob(string Url, Func<Uri, bool> IsTarget, string Script);
+
+    // Json is the script's result. HttpStatus is set when the target page itself returned an error.
+    public sealed record PageResult(FetchStatus Status, string? Json = null, int HttpStatus = 0, string? Message = null);
+
+    TaskCompletionSource<PageResult>? pending;
+    PageJob? job;
     bool interactive;
     int navigationId;
 
@@ -100,7 +107,18 @@ sealed class BrowserForm : Form
         web.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
     }
 
-    public Task<FetchResult> FetchAsync(bool showSignIn)
+    public async Task<FetchResult> FetchAsync(bool showSignIn)
+    {
+        var page = await LoadAsync(new PageJob(WaitingListsUrl, IsWaitingListsPage, ExtractScript), showSignIn);
+        return page.Status switch
+        {
+            FetchStatus.Ok => ParseLists(page.Json!),
+            FetchStatus.LoginRequired => FetchResult.LoginRequired,
+            _ => FetchResult.Fail(page.Message ?? "Couldn't check vatsim.uk"),
+        };
+    }
+
+    public Task<PageResult> LoadAsync(PageJob newJob, bool showSignIn = false)
     {
         if (pending != null)
         {
@@ -109,17 +127,25 @@ sealed class BrowserForm : Form
             return pending.Task;
         }
 
-        pending = new TaskCompletionSource<FetchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        job = newJob;
+        pending = new TaskCompletionSource<PageResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var task = pending.Task;
         if (showSignIn)
             ShowSignIn();
         else
             StartTimeout(task);
-        web.CoreWebView2.Navigate(WaitingListsUrl);
+        web.CoreWebView2.Navigate(newJob.Url);
         return task;
     }
 
     public void SignOut() => web.CoreWebView2?.CookieManager.DeleteAllCookies();
+
+    public static bool IsVatsimUk(Uri uri) =>
+        uri.Host.Equals("www.vatsim.uk", StringComparison.OrdinalIgnoreCase)
+        || uri.Host.Equals("vatsim.uk", StringComparison.OrdinalIgnoreCase);
+
+    static bool IsWaitingListsPage(Uri uri) =>
+        IsVatsimUk(uri) && uri.AbsolutePath.TrimEnd('/').Equals("/mship/waiting-lists", StringComparison.OrdinalIgnoreCase);
 
     void ShowSignIn()
     {
@@ -128,59 +154,72 @@ sealed class BrowserForm : Form
         Activate();
     }
 
-    async void StartTimeout(Task<FetchResult> task)
+    async void StartTimeout(Task<PageResult> task)
     {
         await Task.Delay(TimeSpan.FromSeconds(60));
         if (pending?.Task == task && !interactive)
-            Complete(FetchResult.Fail("Timed out waiting for vatsim.uk"));
+            Complete(new PageResult(FetchStatus.Error, Message: "Timed out waiting for vatsim.uk"));
     }
 
     async void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
-        if (pending == null)
+        if (pending == null || job == null)
             return;
 
         int id = ++navigationId;
         var uri = new Uri(web.CoreWebView2.Source);
-        bool onVatsimUk = uri.Host.Equals("www.vatsim.uk", StringComparison.OrdinalIgnoreCase)
-                          || uri.Host.Equals("vatsim.uk", StringComparison.OrdinalIgnoreCase);
-        bool onWaitingLists = onVatsimUk && uri.AbsolutePath.TrimEnd('/').Equals("/mship/waiting-lists", StringComparison.OrdinalIgnoreCase);
 
-        if (onWaitingLists && e.IsSuccess)
+        if (job.IsTarget(uri))
         {
-            var result = await ExtractAsync();
-            if (interactive)
-                Hide();
-            Complete(result);
-            return;
+            if (e.HttpStatusCode >= 400)
+            {
+                Complete(new PageResult(FetchStatus.Error, HttpStatus: e.HttpStatusCode, Message: $"vatsim.uk returned HTTP {e.HttpStatusCode}"));
+                return;
+            }
+            if (e.IsSuccess)
+            {
+                string? json = null;
+                string? error = null;
+                try
+                {
+                    json = await web.CoreWebView2.ExecuteScriptAsync(job.Script);
+                }
+                catch (Exception ex)
+                {
+                    error = "Couldn't read the vatsim.uk page: " + ex.Message;
+                }
+                if (interactive)
+                    Hide();
+                Complete(error == null ? new PageResult(FetchStatus.Ok, json) : new PageResult(FetchStatus.Error, Message: error));
+                return;
+            }
         }
 
         if (interactive)
         {
             // After SSO the site may land on the dashboard rather than the page we asked for.
-            if (onVatsimUk && uri.AbsolutePath.StartsWith("/mship/", StringComparison.OrdinalIgnoreCase))
-                web.CoreWebView2.Navigate(WaitingListsUrl);
+            if (IsVatsimUk(uri) && uri.AbsolutePath.StartsWith("/mship/", StringComparison.OrdinalIgnoreCase))
+                web.CoreWebView2.Navigate(job.Url);
             return;
         }
 
         if (!e.IsSuccess)
         {
-            Complete(FetchResult.Fail($"Couldn't reach vatsim.uk ({e.WebErrorStatus})"));
+            Complete(new PageResult(FetchStatus.Error, Message: $"Couldn't reach vatsim.uk ({e.WebErrorStatus})"));
             return;
         }
 
-        // Somewhere other than the waiting lists, which means the session has expired.
+        // Somewhere other than the page we asked for, which means the session has expired.
         // Give script-driven SSO redirects a few seconds to bring us back first.
         await Task.Delay(TimeSpan.FromSeconds(8));
         if (pending != null && !interactive && id == navigationId)
-            Complete(FetchResult.LoginRequired);
+            Complete(new PageResult(FetchStatus.LoginRequired));
     }
 
-    async Task<FetchResult> ExtractAsync()
+    static FetchResult ParseLists(string json)
     {
         try
         {
-            var json = await web.CoreWebView2.ExecuteScriptAsync(ExtractScript);
             var scraped = JsonSerializer.Deserialize<ScrapeResult>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             if (scraped == null || !scraped.Found)
                 return FetchResult.Fail("Couldn't find the waiting list tables. The page layout may have changed.");
@@ -202,10 +241,11 @@ sealed class BrowserForm : Form
         }
     }
 
-    void Complete(FetchResult result)
+    void Complete(PageResult result)
     {
         var tcs = pending;
         pending = null;
+        job = null;
         interactive = false;
         tcs?.TrySetResult(result);
     }
@@ -218,7 +258,7 @@ sealed class BrowserForm : Form
             e.Cancel = true;
             Hide();
             if (interactive)
-                Complete(FetchResult.LoginRequired);
+                Complete(new PageResult(FetchStatus.LoginRequired));
         }
         base.OnFormClosing(e);
     }

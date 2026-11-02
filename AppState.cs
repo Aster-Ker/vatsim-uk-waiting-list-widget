@@ -20,6 +20,58 @@ sealed class WaitingListEntry
     public string Key => $"{Department}|{Name}";
 }
 
+// A booking from the member's vatsim.uk calendar feed: ATC booking, mentoring session or exam.
+sealed class SessionBooking
+{
+    public string Uid { get; set; } = "";
+    public string Kind { get; set; } = "";
+    public string? Position { get; set; }
+    public DateTime Start { get; set; }
+    public DateTime End { get; set; }
+    public string? Mentor { get; set; }
+    public string? Examiner { get; set; }
+    public string? Student { get; set; }
+    public string? Url { get; set; }
+
+    public string Title => Position == null ? Kind : $"{Position} · {Kind}";
+
+    // The feed names the student only when you're the mentor or examiner.
+    public string? WithWhom => Student != null ? $"Student: {Student}"
+        : Mentor != null ? $"Mentor: {Mentor}"
+        : Examiner != null ? $"Examiner: {Examiner}"
+        : null;
+
+    public string TimeRange => $"{Start.ToLocalTime():ddd d MMM}, {Start.ToLocalTime():HH:mm}–{End.ToLocalTime():HH:mm}";
+}
+
+// A row from "My Training History": a past mentoring session and whether its report is filed.
+sealed class TrainingRecord
+{
+    public string Id { get; set; } = "";
+    public string Position { get; set; } = "";
+    public string Date { get; set; } = "";
+    public string Mentor { get; set; } = "";
+    public string Status { get; set; } = "";
+    public string? ReportUrl { get; set; }
+}
+
+sealed class SessionsState
+{
+    public string? FeedUrl { get; set; }
+    public List<SessionBooking> Bookings { get; set; } = new();
+    public List<TrainingRecord> History { get; set; } = new();
+    public bool HistoryAvailable { get; set; } = true;
+    public DateTime? LastChecked { get; set; }
+    public string? Message { get; set; }
+    public bool Alerts { get; set; } = true;
+    public int RemindMinutes { get; set; } = 30;
+    // Sessions already reminded about, so a reminder pops up once.
+    public HashSet<string> Reminded { get; set; } = new();
+
+    public List<SessionBooking> Upcoming(DateTime nowUtc) =>
+        Bookings.Where(b => b.End > nowUtc).OrderBy(b => b.Start).ToList();
+}
+
 sealed class AppState
 {
     public static string DataDir { get; } = Path.Combine(
@@ -36,6 +88,7 @@ sealed class AppState
     public bool NotifyChanges { get; set; } = true;
     public DateTime? LastChecked { get; set; }
     public List<WaitingListEntry> Lists { get; set; } = new();
+    public SessionsState Sessions { get; set; } = new();
 
     public static AppState Load()
     {

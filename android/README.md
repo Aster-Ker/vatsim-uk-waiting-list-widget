@@ -26,7 +26,16 @@ so a newer APK installs over the old one and keeps your sign-in and settings.
 - Position alerts pop up, vibrate and ring with your alarm sound, even on silent. Turn off **Alarm sound** in the app to use your normal notification sound instead; **Sound settings** opens Android's settings for that alert.
 - Highlights lists that moved in the last 24 hours
 - Checks in the background every 15 minutes to 6 hours (default 1 hour)
-- Three home screen widgets, all resizable:
+- **Sessions:** your ATC bookings, mentoring sessions and exams from vatsim.uk, found automatically from the
+  dashboard's calendar link
+  - A **Next session** card with a live countdown: upcoming, starting soon, in progress
+  - **All sessions** lists every upcoming event by day, and past ones with their report status. Tap an event to
+    open it on vatsim.uk, read the feedback or add it to your phone's calendar
+  - A **reminder alarm** before each session (10 minutes to 2 hours, default 30 minutes)
+  - Alerts when a session is booked, moved or removed, and when your mentor files feedback; the report opens
+    in the app, already signed in
+- Four home screen widgets, all resizable:
+  - **Next session**: your next booking with a countdown, from 2×1 to a 2×2 card
   - **Best position**: 1×1 shows just the number, 2×1 adds the list name, 2×2 is a card
   - **Positions strip**: a 4×1 row with 2–5 lists side by side, depending on width
   - **Waiting lists**: a full list with a refresh button, showing 1–6 rows depending on height
