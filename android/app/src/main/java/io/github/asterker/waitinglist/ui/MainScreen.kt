@@ -1,6 +1,16 @@
 package io.github.asterker.waitinglist.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,15 +41,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,15 +91,10 @@ enum class WidgetKind(val title: String, val description: String) {
 }
 
 private enum class Page(val label: String, val title: String, val icon: ImageVector) {
-    Sessions("Sessions", "Sessions", icon("M20,3h-1V1h-2v2H7V1H5v2H4C2.9,3 2,3.9 2,5v16c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V5C22,3.9 21.1,3 20,3zM20,21H4V8h16V21z")),
-    WaitingLists("Lists", "Waiting lists", icon("M2,17h2v0.5H3v1h1v0.5H2v1h3v-4H2v1zM3,8h1V4H2v1h1v3zM2,11h1.8L2,13.1v0.9h3v-1H3.2L5,10.9V10H2v1zM7,5v2h14V5H7zM7,19h14v-2H7v2zM7,13h14v-2H7v2z")),
-    Settings("Settings", "Settings", icon("M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z")),
+    Sessions("Sessions", "Sessions", PanelIcons.Calendar),
+    WaitingLists("Lists", "Waiting lists", PanelIcons.ListOrdered),
+    Settings("Settings", "Settings", PanelIcons.Settings),
 }
-
-private fun icon(path: String): ImageVector =
-    ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
-        .addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black))
-        .build()
 
 @Composable
 fun MainScreen(state: AppState, canPinWidget: Boolean, actions: Actions) {
@@ -109,33 +113,45 @@ fun MainScreen(state: AppState, canPinWidget: Boolean, actions: Actions) {
     }
 
     Column(Modifier.fillMaxSize().background(c.background)) {
-        Column(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            Header(page.title, state)
-            Spacer(Modifier.height(16.dp))
+        // Pages slide in from the side of the tab you picked.
+        AnimatedContent(
+            targetState = page,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = {
+                val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                (slideInHorizontally(tween(260)) { it / 6 * direction } + fadeIn(tween(260)))
+                    .togetherWith(slideOutHorizontally(tween(200)) { -it / 6 * direction } + fadeOut(tween(160)))
+            },
+            label = "page",
+        ) { shown ->
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Header(shown.title, state)
+                Spacer(Modifier.height(16.dp))
 
-            if (state.status == Status.LoginRequired && page != Page.Settings) {
-                PanelAlert(c.warning, "Sign in needed", "Your vatsim.uk session has expired.", "Sign in", actions.signIn)
+                if (state.status == Status.LoginRequired && shown != Page.Settings) {
+                    PanelAlert(c.warning, "Sign in needed", "Your vatsim.uk session has expired.", "Sign in", actions.signIn)
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                when (shown) {
+                    Page.Sessions -> SessionsPage(state.sessions, now, actions.openPage, actions.addToCalendar)
+                    Page.WaitingLists -> WaitingListsPage(state, actions)
+                    Page.Settings -> SettingsPage(state, canPinWidget, actions)
+                }
                 Spacer(Modifier.height(16.dp))
             }
-
-            when (page) {
-                Page.Sessions -> SessionsPage(state.sessions, now, actions.openPage, actions.addToCalendar)
-                Page.WaitingLists -> WaitingListsPage(state, actions)
-                Page.Settings -> SettingsPage(state, canPinWidget, actions)
-            }
-            Spacer(Modifier.height(16.dp))
         }
         BottomBar(page) { pageIndex = it.ordinal }
     }
 }
 
+// A compact bar: the selected tab's pill grows in behind its icon and its label darkens.
 @Composable
 private fun BottomBar(current: Page, onSelect: (Page) -> Unit) {
     val c = LocalPanel.current
@@ -145,27 +161,40 @@ private fun BottomBar(current: Page, onSelect: (Page) -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             Page.entries.forEach { page ->
                 val selected = page == current
+                val pillWidth by animateDpAsState(if (selected) 52.dp else 24.dp, tween(220), label = "pill")
+                val pillColor by animateColorAsState(if (selected) c.secondary else c.card, tween(220), label = "pillColor")
+                val tint by animateColorAsState(if (selected) c.foreground else c.muted, tween(220), label = "tint")
                 Column(
                     Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (selected) c.secondary else Color.Transparent)
-                        .clickable { onSelect(page) }
-                        .padding(vertical = 8.dp),
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onSelect(page) }
+                        .padding(vertical = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(page.icon, contentDescription = null, tint = if (selected) c.foreground else c.muted, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.height(2.dp))
+                    Box(
+                        Modifier
+                            .width(pillWidth)
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(pillColor),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(page.icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                    }
                     Text(
                         page.label,
-                        color = if (selected) c.foreground else c.muted,
-                        fontSize = 12.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = tint,
+                        fontSize = 11.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
