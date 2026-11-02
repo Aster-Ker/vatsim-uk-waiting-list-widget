@@ -19,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,10 +50,13 @@ fun SessionsPage(
     onAddToCalendar: (SessionBooking) -> Unit,
 ) {
     val c = LocalPanel.current
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    // Null until you pick a tab; until then, open on Past when there's nothing to show under Upcoming.
+    var picked by rememberSaveable { mutableStateOf<Int?>(null) }
     var expanded by remember { mutableStateOf<String?>(null) }
     val remindMillis = sessions.remindMinutes * 60_000L
     val upcoming = sessions.upcoming(now)
+    val later = upcoming.drop(1)
+    val tab = picked ?: if (later.isEmpty()) 1 else 0
 
     Column {
         SectionLabel("Next session")
@@ -81,11 +83,10 @@ fun SessionsPage(
         }
 
         Spacer(Modifier.height(24.dp))
-        Segmented(listOf("Upcoming", "Past"), tab, { tab = it })
+        Segmented(listOf("Upcoming", "Past"), tab, { picked = it })
         Spacer(Modifier.height(16.dp))
 
         if (tab == 0) {
-            val later = upcoming.drop(1)
             if (later.isEmpty()) {
                 EmptyCard(if (upcoming.isEmpty()) "No upcoming bookings." else "Nothing else booked after your next session.")
             }
