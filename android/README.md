@@ -21,7 +21,7 @@ so a newer APK installs over the old one and keeps your sign-in and settings.
 
 ## What it does
 
-The app has three pages, switched with the bar at the bottom:
+The app has three pages. Swipe left or right to move between them, or tap the bar at the bottom:
 
 - **Sessions**: your next session with a countdown, then every upcoming session by day and past ones with their report status
 - **Lists**: your waiting list positions, with **Check now**

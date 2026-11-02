@@ -1,16 +1,12 @@
 package io.github.asterker.waitinglist.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,11 +35,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +55,7 @@ import io.github.asterker.waitinglist.data.Status
 import io.github.asterker.waitinglist.data.WaitingListEntry
 import io.github.asterker.waitinglist.data.formatInterval
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -99,10 +94,15 @@ private enum class Page(val label: String, val title: String, val icon: ImageVec
 @Composable
 fun MainScreen(state: AppState, canPinWidget: Boolean, actions: Actions) {
     val c = LocalPanel.current
-    var pageIndex by rememberSaveable { mutableIntStateOf(0) }
-    val page = Page.entries[pageIndex]
+    // Swipe left or right anywhere to change page, or tap the bar.
+    val pager = rememberPagerState { Page.entries.size }
+    val scope = rememberCoroutineScope()
+    fun goTo(page: Page) {
+        scope.launch { pager.animateScrollToPage(page.ordinal, animationSpec = tween(220)) }
+    }
+    val page = Page.entries[pager.currentPage]
     // Back from another page returns to Sessions before leaving the app.
-    BackHandler(enabled = page != Page.Sessions) { pageIndex = 0 }
+    BackHandler(enabled = page != Page.Sessions) { goTo(Page.Sessions) }
 
     // Ticks so countdowns stay current while the screen is open.
     val now by produceState(System.currentTimeMillis()) {
@@ -113,17 +113,13 @@ fun MainScreen(state: AppState, canPinWidget: Boolean, actions: Actions) {
     }
 
     Column(Modifier.fillMaxSize().background(c.background)) {
-        // Pages slide in from the side of the tab you picked.
-        AnimatedContent(
-            targetState = page,
+        HorizontalPager(
+            state = pager,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            transitionSpec = {
-                val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                (slideInHorizontally(tween(260)) { it / 6 * direction } + fadeIn(tween(260)))
-                    .togetherWith(slideOutHorizontally(tween(200)) { -it / 6 * direction } + fadeOut(tween(160)))
-            },
-            label = "page",
-        ) { shown ->
+            beyondViewportPageCount = 1,
+            verticalAlignment = Alignment.Top,
+        ) { index ->
+            val shown = Page.entries[index]
             Column(
                 Modifier
                     .fillMaxSize()
@@ -147,7 +143,8 @@ fun MainScreen(state: AppState, canPinWidget: Boolean, actions: Actions) {
                 Spacer(Modifier.height(16.dp))
             }
         }
-        BottomBar(page) { pageIndex = it.ordinal }
+        // Follows the swipe: the tab switches as soon as the new page is more than halfway in.
+        BottomBar(Page.entries[pager.targetPage]) { goTo(it) }
     }
 }
 
@@ -165,9 +162,9 @@ private fun BottomBar(current: Page, onSelect: (Page) -> Unit) {
         ) {
             Page.entries.forEach { page ->
                 val selected = page == current
-                val pillWidth by animateDpAsState(if (selected) 52.dp else 24.dp, tween(220), label = "pill")
-                val pillColor by animateColorAsState(if (selected) c.secondary else c.card, tween(220), label = "pillColor")
-                val tint by animateColorAsState(if (selected) c.foreground else c.muted, tween(220), label = "tint")
+                val pillWidth by animateDpAsState(if (selected) 52.dp else 24.dp, tween(140), label = "pill")
+                val pillColor by animateColorAsState(if (selected) c.secondary else c.card, tween(140), label = "pillColor")
+                val tint by animateColorAsState(if (selected) c.foreground else c.muted, tween(140), label = "tint")
                 Column(
                     Modifier
                         .weight(1f)
