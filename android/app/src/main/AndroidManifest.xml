@@ -33,6 +33,11 @@
             android:label="Sign in" />
 
         <activity
+            android:name=".ui.ReportActivity"
+            android:exported="false"
+            android:label="Mentor report" />
+
+        <activity
             android:name=".ui.WebPageActivity"
             android:exported="false"
             android:label="VATSIM UK" />

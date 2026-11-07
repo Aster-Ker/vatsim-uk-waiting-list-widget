@@ -14,7 +14,7 @@ android {
         applicationId = "io.github.asterker.waitinglist"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
+        versionCode = 11
         versionName = "1.4.0"
     }
 
@@ -56,4 +56,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("org.jsoup:jsoup:1.18.3")
+
+    testImplementation("junit:junit:4.13.2")
 }

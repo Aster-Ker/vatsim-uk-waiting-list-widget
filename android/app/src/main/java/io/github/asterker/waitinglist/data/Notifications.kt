@@ -17,6 +17,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import io.github.asterker.waitinglist.R
 import io.github.asterker.waitinglist.ui.MainActivity
+import io.github.asterker.waitinglist.ui.ReportActivity
 import io.github.asterker.waitinglist.ui.WebPageActivity
 
 object Notifications {
@@ -150,11 +151,12 @@ object Notifications {
         post(context, nextChangeId++, builder)
     }
 
-    // Opens a vatsim.uk page (a mentor report) inside the app, where you're already signed in.
+    // Opens a mentor report in the app's own layout, or another vatsim.uk page in the in-app browser.
     private fun openPage(context: Context, url: String): PendingIntent = PendingIntent.getActivity(
         context,
         url.hashCode(),
-        WebPageActivity.intent(context, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        (if (ReportClient.isReportUrl(url)) ReportActivity.intent(context, url) else WebPageActivity.intent(context, url))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 

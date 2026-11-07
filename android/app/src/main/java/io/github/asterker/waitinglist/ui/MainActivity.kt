@@ -91,7 +91,7 @@ private fun App() {
         openWebsite = {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(WaitingListClient.WAITING_LISTS_URL)))
         },
-        openPage = { url -> context.startActivity(WebPageActivity.intent(context, url)) },
+        openPage = { url -> ReportActivity.open(context, url) },
         addToCalendar = { booking ->
             val intent = Intent(Intent.ACTION_INSERT)
                 .setData(CalendarContract.Events.CONTENT_URI)
