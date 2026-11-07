@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.asterker.waitinglist.data.Criterion
+import io.github.asterker.waitinglist.data.ExamReport
 import io.github.asterker.waitinglist.data.MentorReport
 import io.github.asterker.waitinglist.data.ReportClient
 import io.github.asterker.waitinglist.data.Store
@@ -50,7 +51,7 @@ import io.github.asterker.waitinglist.data.scoreLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// Shows a mentor report in the app's own layout, read from vatsim.uk with the app's sign-in.
+// Shows a mentor or exam report in the app's own layout, read from vatsim.uk with the app's sign-in.
 class ReportActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +71,7 @@ class ReportActivity : ComponentActivity() {
         fun intent(context: Context, url: String): Intent =
             Intent(context, ReportActivity::class.java).putExtra(EXTRA_URL, url)
 
-        // Mentor reports open natively; any other vatsim.uk page opens in the in-app browser.
+        // Mentor and exam reports open natively; any other vatsim.uk page opens in the in-app browser.
         fun open(context: Context, url: String) {
             context.startActivity(
                 if (ReportClient.isReportUrl(url)) intent(context, url) else WebPageActivity.intent(context, url)
@@ -109,7 +110,7 @@ private fun ReportScreen(url: String, onClose: () -> Unit) {
         PanelButton("‹ Back", onClose, style = ButtonStyle.Ghost)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Mentor report",
+            if (ReportClient.isExamReportUrl(url)) "Exam report" else "Mentor report",
             color = c.foreground,
             fontSize = 26.sp,
             fontWeight = FontWeight.SemiBold,
@@ -131,7 +132,10 @@ private fun ReportScreen(url: String, onClose: () -> Unit) {
                 PanelButton("Open on vatsim.uk", openOnWebsite, modifier = Modifier.fillMaxWidth())
             }
             is ReportClient.Result.Ok -> {
-                Report(current.report)
+                when (val report = current.report) {
+                    is MentorReport -> MentorReportView(report)
+                    is ExamReport -> ExamReportView(report)
+                }
                 Spacer(Modifier.height(16.dp))
                 PanelButton("Open on vatsim.uk", openOnWebsite, modifier = Modifier.fillMaxWidth())
             }
@@ -141,7 +145,83 @@ private fun ReportScreen(url: String, onClose: () -> Unit) {
 }
 
 @Composable
-private fun Report(report: MentorReport) {
+private fun ExamReportView(report: ExamReport) {
+    val c = LocalPanel.current
+
+    PanelCard {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(report.position ?: "Practical exam", color = c.foreground, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    report.exam?.let { Text("$it practical exam", color = c.foreground, fontSize = 14.sp) }
+                }
+                report.result?.let { ExamResultBadge(it) }
+            }
+            report.date?.let { Text(it, color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp)) }
+            if (report.examiners.isNotEmpty() || report.qualification != null) Spacer(Modifier.height(8.dp))
+            report.examiners.forEach { (role, name) -> Text("$role examiner: $name", color = c.muted, fontSize = 13.sp) }
+            report.qualification?.let { Text("Your rating at the time: $it", color = c.muted, fontSize = 13.sp) }
+        }
+    }
+
+    report.comments?.let { comments ->
+        Spacer(Modifier.height(20.dp))
+        SectionLabel("Examiner's comments")
+        PanelCard {
+            Text(comments, color = c.foreground, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(16.dp))
+        }
+    }
+
+    if (report.grades.isNotEmpty()) {
+        Spacer(Modifier.height(20.dp))
+        SectionLabel("Grades")
+        PanelCard {
+            report.grades.forEachIndexed { i, grade ->
+                if (i > 0) Divider()
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(grade.criterion, color = c.foreground, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        GradeBadge(grade.grade)
+                    }
+                    grade.notes?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = c.muted, fontSize = 13.5.sp, lineHeight = 19.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Passed green, Partial Pass amber, Failed red, Incomplete amber, as on vatsim.uk.
+@Composable
+private fun ExamResultBadge(result: String) {
+    val c = LocalPanel.current
+    val role = when {
+        result.startsWith("Fail", ignoreCase = true) -> c.destructive
+        result.startsWith("Pass", ignoreCase = true) -> c.success
+        else -> c.warning
+    }
+    RoleBadge(result, role, dot = true)
+}
+
+// vatsim.uk's grade colours: Fully Competent green, Mostly amber, Partly orange, Fail red, Not Assessed grey.
+@Composable
+private fun GradeBadge(grade: String?) {
+    val c = LocalPanel.current
+    val colour = when (grade?.lowercase()) {
+        "fully competent" -> Color(0xFF10B981)
+        "mostly competent" -> Color(0xFFF59E0B)
+        "partly competent" -> Color(0xFFF97316)
+        "fail" -> Color(0xFFEF4444)
+        else -> Color(0xFF9CA3AF)
+    }
+    Badge(grade ?: "Not assessed", if (c.isDark) colour else colour.darken(), colour.copy(alpha = if (c.isDark) 0.18f else 0.14f))
+}
+
+@Composable
+private fun MentorReportView(report: MentorReport) {
     val c = LocalPanel.current
 
     PanelCard {

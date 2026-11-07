@@ -43,6 +43,8 @@ The app has three pages. Swipe left or right to move between them, or tap the ba
   - Alerts when a session is booked, moved or removed, and when your mentor files feedback
   - **Practical exam history** on the Past tab: each exam with its result (Passed, Partial Pass, Failed…) and
     report link, plus an alert when a new result appears
+  - Practical exam reports open in the app's own layout too: result, examiners, the examiner's comments
+    and each criterion's grade (Fully Competent to Fail) with notes
   - Mentor reports open in the app's own layout: the session summary, each criterion's score with a
     progress bar and change since last time, your mentor's notes and additional comments
 - Four home screen widgets, all resizable:

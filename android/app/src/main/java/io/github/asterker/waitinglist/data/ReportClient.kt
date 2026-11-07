@@ -8,7 +8,9 @@ import org.jsoup.nodes.TextNode
 import org.jsoup.select.NodeTraversor
 import org.jsoup.select.NodeVisitor
 
-// A mentor report from vatsim.uk's Training section, read into plain data so the app can show it natively.
+// Reports from vatsim.uk's Training section, read into plain data so the app can show them natively.
+sealed interface Report
+
 data class MentorReport(
     val position: String?,
     val dateTime: String?,
@@ -17,9 +19,26 @@ data class MentorReport(
     val notices: List<ReportNotice>,
     val categories: List<ReportCategory>,
     val comments: String?,
-) {
+) : Report {
     val isEmpty: Boolean get() = position == null && mentor == null && categories.isEmpty() && comments == null
 }
+
+data class ExamReport(
+    val exam: String?,
+    val position: String?,
+    val date: String?,
+    val qualification: String?,
+    // Primary, secondary and trainee examiners that are set, as (role, name).
+    val examiners: List<Pair<String, String>>,
+    val result: String?,
+    val comments: String?,
+    val grades: List<ExamGrade>,
+) : Report {
+    val isEmpty: Boolean get() = exam == null && position == null && result == null && grades.isEmpty()
+}
+
+// One criterion: Fully Competent, Mostly Competent, Partly Competent, Not Assessed or Fail.
+data class ExamGrade(val criterion: String, val grade: String?, val notes: String?)
 
 data class ReportNotice(val heading: String, val description: String?)
 
@@ -48,21 +67,28 @@ fun scoreLevel(label: String?): Int? = when (label?.trim()?.lowercase()) {
 
 object ReportClient {
     sealed interface Result {
-        data class Ok(val report: MentorReport) : Result
+        data class Ok(val report: Report) : Result
         data object LoginRequired : Result
         data class Error(val message: String) : Result
     }
 
-    fun isReportUrl(url: String): Boolean = url.contains("/mentoring/report/")
+    fun isMentorReportUrl(url: String): Boolean = url.contains("/mentoring/report/")
+    fun isExamReportUrl(url: String): Boolean = url.contains("/exams/report/")
+    fun isReportUrl(url: String): Boolean = isMentorReportUrl(url) || isExamReportUrl(url)
 
     fun fetch(context: Context, url: String): Result {
+        val marker = if (isExamReportUrl(url)) "/exams/report/" else "/mentoring/report/"
         val page = WaitingListClient.fetchPage(context, url) { target ->
-            WaitingListClient.isVatsimUk(target) && target.path.contains("/mentoring/report/")
+            WaitingListClient.isVatsimUk(target) && target.path.contains(marker)
         }
         return when (page) {
             is WaitingListClient.Page.Html -> {
-                val report = parse(page.html, page.url)
-                if (report.isEmpty) Result.Error("Couldn't read this report. The page layout may have changed.")
+                val (report, empty) = if (isExamReportUrl(url)) {
+                    parseExam(page.html, page.url).let { it to it.isEmpty }
+                } else {
+                    parse(page.html, page.url).let { it to it.isEmpty }
+                }
+                if (empty) Result.Error("Couldn't read this report. The page layout may have changed.")
                 else Result.Ok(report)
             }
             WaitingListClient.Page.LoginRequired -> Result.LoginRequired
@@ -108,6 +134,53 @@ object ReportClient {
             categories = categories,
             comments = comments?.ifEmpty { null },
         )
+    }
+
+    // The exam report has "Student" and "Exam" sections, an "Exam Result" section with the result
+    // and additional comments, then (for ATC exams) a "Grades" list of criteria with grade and notes.
+    fun parseExam(html: String, baseUri: String): ExamReport {
+        val document = Jsoup.parse(html, baseUri)
+        val sections = document.select(".fi-section")
+        fun section(title: String) = sections.firstOrNull { heading(it).equals(title, ignoreCase = true) }
+        fun entries(section: Element?) = section?.select(".fi-in-entry").orEmpty().associateBy { label(it) }
+
+        val exam = entries(section("Exam"))
+        val student = entries(section("Student"))
+        val resultSection = section("Exam Result")
+        val result = entries(resultSection)
+
+        val examiners = listOf("Primary Examiner" to "Primary", "Secondary Examiner" to "Secondary", "Trainee Examiner" to "Trainee")
+            .mapNotNull { (label, role) -> exam[label]?.let(::value)?.ifEmpty { null }?.let { role to it } }
+
+        val grades = document.select(".fi-in-repeatable-item").mapNotNull { item ->
+            val itemEntries = item.select(".fi-in-entry")
+            val criterion = itemEntries.firstOrNull { label(it) !in setOf("Result", "Notes") }?.let(::value)?.ifEmpty { null }
+                ?: return@mapNotNull null
+            ExamGrade(
+                criterion = criterion,
+                grade = itemEntries.firstOrNull { label(it) == "Result" }?.let(::value)?.ifEmpty { null },
+                notes = itemEntries.firstOrNull { label(it) == "Notes" }?.selectFirst(".fi-in-entry-content")?.let(::richText)?.ifEmpty { null },
+            )
+        }
+
+        return ExamReport(
+            exam = exam["Exam"]?.let(::value)?.ifEmpty { null },
+            position = exam["Position"]?.let(::value)?.ifEmpty { null },
+            date = exam["Date"]?.let(::value)?.ifEmpty { null }?.let(::friendlyDate),
+            qualification = student["Qualification"]?.let(::value)?.ifEmpty { null },
+            examiners = examiners,
+            result = result["Result"]?.let(::value)?.ifEmpty { null },
+            comments = result["Additional Comments"]?.selectFirst(".fi-in-entry-content")?.let(::richText)?.ifEmpty { null },
+            grades = grades,
+        )
+    }
+
+    // The exam date comes through as stored, e.g. "2026-10-14 19:00:00"; show it as "Wed 14 Oct 2026, 19:00".
+    private fun friendlyDate(raw: String): String {
+        val parsed = runCatching {
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.UK).apply { isLenient = false }.parse(raw)
+        }.getOrNull() ?: return raw
+        return java.text.SimpleDateFormat("EEE d MMM yyyy, HH:mm", java.util.Locale.UK).format(parsed)
     }
 
     // Each criterion is a grid row with the field name, its notes, and either a progress

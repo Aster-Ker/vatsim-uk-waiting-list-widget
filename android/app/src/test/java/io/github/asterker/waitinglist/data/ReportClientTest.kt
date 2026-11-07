@@ -122,6 +122,45 @@ class ReportClientTest {
         assertEquals("Great session overall.\nWork on phraseology.\nSee you next week.", report.comments)
     }
 
+    private val examHtml = """
+        <html><body>
+        ${section("", section("Student", entry("Name", "Alex Pilot") + entry("CID", "1234567") + entry("Qualification", "S1")) +
+            section("Exam", entry("Exam", "S2") + entry("Position", "EGKK_TWR") + entry("Date", "2026-10-14 19:00:00") +
+                entry("Primary Examiner", "Jo Examiner") + entry("Secondary Examiner", "") + entry("Trainee Examiner", "")))}
+        ${section("Exam Result", entry("Result", "", content = """<span class="fi-badge fi-color-success"><span class="fi-badge-label">Passed</span></span>""") +
+            entry("Additional Comments", "", content = """<div class="fi-in-text"><div class="fi-in-text-item">Solid exam.<br>Well done!</div></div>"""))}
+        <h1 class="text-xl font-bold">Grades</h1>
+        <div class="fi-in-repeatable"><ul>
+          <li class="fi-in-repeatable-item">
+            ${entry("Exam criteria.criteria", "Runway management")}
+            ${entry("Result", "", content = """<div class="flex items-center"><span class="leading-none">Fully Competent</span></div>""")}
+            ${entry("Notes", "", content = """<div class="fi-in-text"><div class="fi-in-text-item">Good spacing.</div></div>""")}
+          </li>
+          <li class="fi-in-repeatable-item">
+            ${entry("Exam criteria.criteria", "Phraseology")}
+            ${entry("Result", "", content = """<div class="flex items-center"><span class="leading-none">Mostly Competent</span></div>""")}
+            ${entry("Notes", "", content = "")}
+          </li>
+        </ul></div>
+        </body></html>
+    """
+
+    @Test
+    fun readsExamReport() {
+        val report = ReportClient.parseExam(examHtml, "https://www.vatsim.uk/training/exams/report/812")
+        assertEquals("S2", report.exam)
+        assertEquals("EGKK_TWR", report.position)
+        assertEquals("Wed 14 Oct 2026, 19:00", report.date)
+        assertEquals("S1", report.qualification)
+        assertEquals(listOf("Primary" to "Jo Examiner"), report.examiners)
+        assertEquals("Passed", report.result)
+        assertEquals("Solid exam.\nWell done!", report.comments)
+        assertEquals(listOf("Runway management", "Phraseology"), report.grades.map { it.criterion })
+        assertEquals(listOf("Fully Competent", "Mostly Competent"), report.grades.map { it.grade })
+        assertEquals("Good spacing.", report.grades[0].notes)
+        assertNull(report.grades[1].notes)
+    }
+
     @Test
     fun emptyPageIsEmpty() {
         assertTrue(ReportClient.parse("<html><body><p>Login</p></body></html>", "https://www.vatsim.uk/").isEmpty)
