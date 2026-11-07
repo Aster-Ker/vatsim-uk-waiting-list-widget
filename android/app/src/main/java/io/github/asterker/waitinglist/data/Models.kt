@@ -101,11 +101,28 @@ data class TrainingRecord(
     val reportUrl: String?,
 )
 
+// A row from "My Exams": a practical or theory exam and its result.
+data class ExamRecord(
+    val id: String,
+    val type: String,
+    val exam: String,
+    val position: String?,
+    val result: String,
+    val score: String?,
+    val date: String,
+    val reportUrl: String?,
+) {
+    val title: String get() = listOfNotNull(exam.ifBlank { null }, position?.ifBlank { null }).joinToString(" · ").ifEmpty { "$type exam" }
+}
+
 data class SessionsState(
     val feedUrl: String? = null,
     val bookings: List<SessionBooking> = emptyList(),
     val history: List<TrainingRecord> = emptyList(),
     val historyAvailable: Boolean = true,
+    val exams: List<ExamRecord> = emptyList(),
+    // When exam results were first read, so results already there don't trigger alerts.
+    val examsChecked: Long? = null,
     val lastChecked: Long? = null,
     val message: String? = null,
     val alerts: Boolean = true,

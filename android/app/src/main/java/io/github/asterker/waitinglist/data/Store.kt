@@ -121,6 +121,22 @@ object Store {
                 )
             },
             historyAvailable = o.optBoolean("historyAvailable", true),
+            exams = (o.optJSONArray("exams") ?: JSONArray()).let { exams ->
+                (0 until exams.length()).map { i ->
+                    val e = exams.getJSONObject(i)
+                    ExamRecord(
+                        id = e.getString("id"),
+                        type = e.optString("type"),
+                        exam = e.optString("exam"),
+                        position = e.stringOrNull("position"),
+                        result = e.optString("result"),
+                        score = e.stringOrNull("score"),
+                        date = e.optString("date"),
+                        reportUrl = e.stringOrNull("reportUrl"),
+                    )
+                }
+            },
+            examsChecked = o.longOrNull("examsChecked"),
             lastChecked = o.longOrNull("lastChecked"),
             message = o.stringOrNull("message"),
             alerts = o.optBoolean("alerts", true),
@@ -158,6 +174,21 @@ object Store {
             }
         })
         put("historyAvailable", s.historyAvailable)
+        put("exams", JSONArray().apply {
+            s.exams.forEach { e ->
+                put(JSONObject().apply {
+                    put("id", e.id)
+                    put("type", e.type)
+                    put("exam", e.exam)
+                    putOpt("position", e.position)
+                    put("result", e.result)
+                    putOpt("score", e.score)
+                    put("date", e.date)
+                    putOpt("reportUrl", e.reportUrl)
+                })
+            }
+        })
+        putOpt("examsChecked", s.examsChecked)
         putOpt("lastChecked", s.lastChecked)
         putOpt("message", s.message)
         put("alerts", s.alerts)

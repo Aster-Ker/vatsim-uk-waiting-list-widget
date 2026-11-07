@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.asterker.waitinglist.data.ExamRecord
 import io.github.asterker.waitinglist.data.SessionBooking
 import io.github.asterker.waitinglist.data.SessionPhase
 import io.github.asterker.waitinglist.data.SessionsState
@@ -111,7 +112,7 @@ fun SessionsPage(
         } else {
             val past = sessions.bookings.filter { it.end <= now }.sortedByDescending { it.start }
             val matched = mutableSetOf<String>()
-            if (past.isEmpty() && sessions.history.isEmpty()) {
+            if (past.isEmpty() && sessions.history.isEmpty() && sessions.exams.isEmpty()) {
                 EmptyCard("No past sessions in the last 30 days.")
             }
             if (past.isNotEmpty()) {
@@ -144,9 +145,56 @@ fun SessionsPage(
                         HistoryEventRow(record, onOpenPage)
                     }
                 }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            if (sessions.exams.isNotEmpty()) {
+                SectionLabel("Exams")
+                PanelCard {
+                    sessions.exams.forEachIndexed { i, exam ->
+                        if (i > 0) Divider()
+                        ExamRow(exam, onOpenPage)
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun ExamRow(exam: ExamRecord, onOpenPage: (String) -> Unit) {
+    val c = LocalPanel.current
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(exam.title, color = c.foreground, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOfNotNull("${exam.type} exam", exam.score, exam.date.ifBlank { null }).joinToString(" · "),
+                color = c.muted,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        ResultBadge(exam.result)
+        exam.reportUrl?.let {
+            Spacer(Modifier.width(8.dp))
+            PanelButton("Report", { onOpenPage(it) })
+        }
+    }
+}
+
+// Passed green, Partial Pass amber, Failed red, anything else (Incomplete) neutral blue.
+@Composable
+private fun ResultBadge(result: String) {
+    val c = LocalPanel.current
+    val role = when {
+        result.startsWith("Failed", ignoreCase = true) -> c.destructive
+        result.startsWith("Partial", ignoreCase = true) -> c.warning
+        result.startsWith("Pass", ignoreCase = true) -> c.success
+        else -> c.info
+    }
+    RoleBadge(result.ifBlank { "No result" }, role)
 }
 
 @Composable

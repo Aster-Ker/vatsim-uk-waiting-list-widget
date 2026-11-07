@@ -57,16 +57,27 @@ object SessionsSync {
             is SessionsClient.Result.Error -> message = message ?: fetched.message
         }
 
+        // Exam results, from My Exams.
+        var exams: List<ExamRecord>? = null
+        when (val fetched = SessionsClient.fetchExams(context)) {
+            is SessionsClient.Result.Ok -> exams = fetched.value ?: emptyList()
+            SessionsClient.Result.LoginRequired -> return Outcome(previous, emptyList(), loginRequired = true)
+            is SessionsClient.Result.Error -> message = message ?: fetched.message
+        }
+
         val firstSync = previous.lastChecked == null
         val notices = mutableListOf<Notice>()
         if (bookings != null && !firstSync) notices += bookingChanges(previous.bookings, bookings, now)
         if (history != null && !firstSync && previous.historyAvailable) notices += reportChanges(previous.history, history)
+        if (exams != null && previous.examsChecked != null) notices += examChanges(previous.exams, exams)
 
         val state = previous.copy(
             feedUrl = feedUrl,
             bookings = bookings ?: previous.bookings,
             history = history ?: previous.history,
             historyAvailable = historyAvailable,
+            exams = exams ?: previous.exams,
+            examsChecked = if (exams != null) previous.examsChecked ?: now else previous.examsChecked,
             lastChecked = if (bookings != null || history != null) now else previous.lastChecked,
             message = message,
         )
@@ -115,6 +126,18 @@ object SessionsSync {
                     record.reportUrl,
                 )
             }
+    }
+
+    private fun examChanges(old: List<ExamRecord>, new: List<ExamRecord>): List<Notice> {
+        val known = old.map { it.id }.toSet()
+        return new.filter { it.id !in known && it.result.isNotBlank() }.map { exam ->
+            Notice(
+                "Exam result: ${exam.result}",
+                listOfNotNull("${exam.type} exam", exam.title, exam.score, exam.date.ifBlank { null }).joinToString(" · ") +
+                    if (exam.reportUrl != null) ". Tap to read the report." else "",
+                exam.reportUrl,
+            )
+        }
     }
 
     fun timeRange(b: SessionBooking): String = "${day(b.start)}, ${time(b.start)}–${time(b.end)}"

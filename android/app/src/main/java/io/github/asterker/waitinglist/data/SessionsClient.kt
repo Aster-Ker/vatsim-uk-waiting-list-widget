@@ -16,6 +16,7 @@ import java.util.TimeZone
 object SessionsClient {
     private const val DASHBOARD_URL = "https://www.vatsim.uk/mship/manage/dashboard"
     const val HISTORY_URL = "https://www.vatsim.uk/training/my-training/mentoring-history"
+    const val EXAMS_URL = "https://www.vatsim.uk/training/my-training/exams"
     private val FEED_URL = Regex("""https://[^\s"'<>]+/calendar/feed/[A-Za-z0-9]{48}\.ics""")
 
     sealed interface Result<out T> {
@@ -141,6 +142,76 @@ object SessionsClient {
             }
         }
         return out.toString()
+    }
+
+    // ---------- Exams ----------
+
+    // Null means the member can't see the Training section (no training access).
+    fun fetchExams(context: Context): Result<List<ExamRecord>?> {
+        val page = WaitingListClient.fetchPage(context, EXAMS_URL) { url ->
+            WaitingListClient.isVatsimUk(url) && url.path.startsWith("/training")
+        }
+        return when (page) {
+            is WaitingListClient.Page.Html -> parseExams(page.html, page.url)
+            WaitingListClient.Page.LoginRequired -> Result.LoginRequired
+            is WaitingListClient.Page.Failed ->
+                if (page.code == 403 || page.code == 404) Result.Ok(null) else Result.Error(page.message)
+        }
+    }
+
+    // "My Exams" has a "Practical Exam History" table (exam, position, result, date, report link)
+    // and a "Theory Exam History" table (exam, score, result, date).
+    fun parseExams(html: String, baseUri: String): Result<List<ExamRecord>?> {
+        val document = Jsoup.parse(html, baseUri)
+        var found = false
+        val exams = mutableListOf<ExamRecord>()
+
+        for (container in document.select(".fi-ta")) {
+            val heading = container.selectFirst(".fi-ta-header-heading")?.text()?.trim().orEmpty()
+            val type = when {
+                heading.contains("Practical Exam History", ignoreCase = true) -> "Practical"
+                heading.contains("Theory Exam History", ignoreCase = true) -> "Theory"
+                else -> continue
+            }
+            found = true
+            val table = container.selectFirst("table.fi-ta-table") ?: container.selectFirst("table") ?: continue
+            val headers = table.select("thead th").map { it.text().trim().lowercase() }
+            fun column(name: String) = headers.indexOfFirst { it.startsWith(name) }
+            // "Exam" exactly, not "Exam date".
+            val examColumn = headers.indexOfFirst { it == "exam" }.takeIf { it >= 0 } ?: 0
+            val positionColumn = column("position")
+            val resultColumn = column("result")
+            val scoreColumn = column("score")
+            val dateColumn = column("exam date")
+
+            for (row in table.select("tbody tr")) {
+                val cells = row.select("td")
+                if (cells.size < 3) continue
+                fun text(i: Int) = if (i < 0) "" else cells.getOrNull(i)?.text()?.trim().orEmpty()
+                val exam = text(examColumn)
+                val result = text(resultColumn)
+                if (exam.isEmpty() && result.isEmpty()) continue
+                val position = text(positionColumn).ifEmpty { null }
+                val date = text(dateColumn)
+                val report = row.selectFirst("a[href*=/exams/report/]")?.absUrl("href")?.ifEmpty { null }
+                exams += ExamRecord(
+                    id = report?.let { "P" + it.substringAfterLast('/') } ?: "${type.first()}|$exam|${position.orEmpty()}|$date",
+                    type = type,
+                    exam = exam,
+                    position = position,
+                    result = result,
+                    score = text(scoreColumn).ifEmpty { null },
+                    date = date,
+                    reportUrl = report,
+                )
+            }
+        }
+
+        return when {
+            found -> Result.Ok(exams)
+            html.contains("Exam History", ignoreCase = true) -> Result.Ok(emptyList())
+            else -> Result.Error("Couldn't read My Exams. The page layout may have changed.")
+        }
     }
 
     // ---------- Training history ----------
