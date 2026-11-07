@@ -16,15 +16,15 @@ static class SessionsService
     public const string HistoryUrl = "https://www.vatsim.uk/training/my-training/mentoring-history";
     public const string ExamsUrl = "https://www.vatsim.uk/training/my-training/exams";
 
-    // Reads the "Practical Exam History" and "Theory Exam History" tables on My Exams.
+    // Reads the "Practical Exam History" table on My Exams; theory and pending exams are skipped.
     const string ExamsScript = """
         (() => {
           const exams = [];
           let found = false;
           for (const container of document.querySelectorAll('.fi-ta')) {
             const heading = (container.querySelector('.fi-ta-header-heading')?.textContent || '').trim();
-            const type = /practical exam history/i.test(heading) ? 'Practical' : /theory exam history/i.test(heading) ? 'Theory' : null;
-            if (!type) continue;
+            if (!/practical exam history/i.test(heading)) continue;
+            const type = 'Practical';
             found = true;
             const table = container.querySelector('table.fi-ta-table') || container.querySelector('table');
             if (!table) continue;
@@ -42,7 +42,7 @@ static class SessionsService
                 score: text(col('score')) || null, date: text(col('exam date')), reportUrl: link ? link.href : null });
             }
           }
-          return { found: found || /Exam History/i.test(document.body.innerText), exams };
+          return { found: found || /Practical Exam History/i.test(document.body.innerText), exams };
         })()
         """;
 
@@ -279,7 +279,7 @@ static class SessionsService
         return fresh
             .Where(e => !known.Contains(e.Id) && !string.IsNullOrWhiteSpace(e.Result))
             .Select(e => new Notice($"Exam result: {e.Result}",
-                Join($"{e.Type} exam", Blank(e.Exam), e.Position, e.Score, Blank(e.Date)) + (e.ReportUrl != null ? ". Click to read the report." : ""),
+                Join("Practical exam", Blank(e.Exam), e.Position, Blank(e.Date)) + (e.ReportUrl != null ? ". Click to read the report." : ""),
                 e.ReportUrl));
     }
 

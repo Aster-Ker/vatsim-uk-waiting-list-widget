@@ -159,8 +159,8 @@ object SessionsClient {
         }
     }
 
-    // "My Exams" has a "Practical Exam History" table (exam, position, result, date, report link)
-    // and a "Theory Exam History" table (exam, score, result, date).
+    // Reads the "Practical Exam History" table on My Exams: exam, position, result, date and report
+    // link. Theory exams and pending exams on the same page are skipped.
     fun parseExams(html: String, baseUri: String): Result<List<ExamRecord>?> {
         val document = Jsoup.parse(html, baseUri)
         var found = false
@@ -168,11 +168,8 @@ object SessionsClient {
 
         for (container in document.select(".fi-ta")) {
             val heading = container.selectFirst(".fi-ta-header-heading")?.text()?.trim().orEmpty()
-            val type = when {
-                heading.contains("Practical Exam History", ignoreCase = true) -> "Practical"
-                heading.contains("Theory Exam History", ignoreCase = true) -> "Theory"
-                else -> continue
-            }
+            if (!heading.contains("Practical Exam History", ignoreCase = true)) continue
+            val type = "Practical"
             found = true
             val table = container.selectFirst("table.fi-ta-table") ?: container.selectFirst("table") ?: continue
             val headers = table.select("thead th").map { it.text().trim().lowercase() }
@@ -209,7 +206,7 @@ object SessionsClient {
 
         return when {
             found -> Result.Ok(exams)
-            html.contains("Exam History", ignoreCase = true) -> Result.Ok(emptyList())
+            html.contains("Practical Exam History", ignoreCase = true) -> Result.Ok(emptyList())
             else -> Result.Error("Couldn't read My Exams. The page layout may have changed.")
         }
     }

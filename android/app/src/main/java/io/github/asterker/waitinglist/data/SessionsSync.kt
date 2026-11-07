@@ -133,7 +133,7 @@ object SessionsSync {
         return new.filter { it.id !in known && it.result.isNotBlank() }.map { exam ->
             Notice(
                 "Exam result: ${exam.result}",
-                listOfNotNull("${exam.type} exam", exam.title, exam.score, exam.date.ifBlank { null }).joinToString(" · ") +
+                listOfNotNull("Practical exam", exam.title, exam.date.ifBlank { null }).joinToString(" · ") +
                     if (exam.reportUrl != null) ". Tap to read the report." else "",
                 exam.reportUrl,
             )

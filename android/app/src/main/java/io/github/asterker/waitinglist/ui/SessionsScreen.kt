@@ -149,7 +149,7 @@ fun SessionsPage(
             }
 
             if (sessions.exams.isNotEmpty()) {
-                SectionLabel("Exams")
+                SectionLabel("Practical exams")
                 PanelCard {
                     sessions.exams.forEachIndexed { i, exam ->
                         if (i > 0) Divider()
@@ -168,7 +168,7 @@ private fun ExamRow(exam: ExamRecord, onOpenPage: (String) -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(exam.title, color = c.foreground, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                listOfNotNull("${exam.type} exam", exam.score, exam.date.ifBlank { null }).joinToString(" · "),
+                listOfNotNull("Practical exam", exam.date.ifBlank { null }).joinToString(" · "),
                 color = c.muted,
                 fontSize = 12.sp,
                 maxLines = 1,

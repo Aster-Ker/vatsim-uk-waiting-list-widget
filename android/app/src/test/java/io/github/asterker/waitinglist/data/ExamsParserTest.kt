@@ -1,7 +1,6 @@
 package io.github.asterker.waitinglist.data
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 // Follows the markup Filament 5 tables produce on vatsim.uk's "My Exams" page.
@@ -57,18 +56,8 @@ class ExamsParserTest {
     }
 
     @Test
-    fun readsTheoryExams() {
-        val theory = parse().single { it.type == "Theory" }
-        assertEquals("S2", theory.exam)
-        assertEquals("38 / 40 (95%)", theory.score)
-        assertEquals("Passed", theory.result)
-        assertNull(theory.position)
-        assertNull(theory.reportUrl)
-    }
-
-    @Test
-    fun ignoresPendingExams() {
-        assertEquals(3, parse().size)
+    fun ignoresTheoryAndPendingExams() {
+        assertEquals(listOf("EGKK_TWR", "EGKK_GND"), parse().map { it.position })
     }
 
     @Test

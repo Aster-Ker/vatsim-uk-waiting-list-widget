@@ -41,8 +41,8 @@ The app has three pages. Swipe left or right to move between them, or tap the ba
     vatsim.uk, read the feedback or add it to your phone's calendar
   - A **reminder alarm** before each session (10 minutes to 2 hours, default 30 minutes)
   - Alerts when a session is booked, moved or removed, and when your mentor files feedback
-  - **Exam history** on the Past tab: practical and theory exams with their result (Passed, Partial Pass,
-    Failed…), theory score and report link, plus an alert when a new result appears
+  - **Practical exam history** on the Past tab: each exam with its result (Passed, Partial Pass, Failed…) and
+    report link, plus an alert when a new result appears
   - Mentor reports open in the app's own layout: the session summary, each criterion's score with a
     progress bar and change since last time, your mentor's notes and additional comments
 - Four home screen widgets, all resizable:
