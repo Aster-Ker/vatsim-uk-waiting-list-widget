@@ -64,12 +64,28 @@ sealed class TrainingRecord
     public string? ReportUrl { get; set; }
 }
 
+// A row from "My Exams": a practical or theory exam and its result.
+sealed class ExamRecord
+{
+    public string Id { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string Exam { get; set; } = "";
+    public string? Position { get; set; }
+    public string Result { get; set; } = "";
+    public string? Score { get; set; }
+    public string Date { get; set; } = "";
+    public string? ReportUrl { get; set; }
+}
+
 sealed class SessionsState
 {
     public string? FeedUrl { get; set; }
     public List<SessionBooking> Bookings { get; set; } = new();
     public List<TrainingRecord> History { get; set; } = new();
     public bool HistoryAvailable { get; set; } = true;
+    public List<ExamRecord> Exams { get; set; } = new();
+    // When exam results were first read, so results already there don't trigger alerts.
+    public DateTime? ExamsChecked { get; set; }
     public DateTime? LastChecked { get; set; }
     public string? Message { get; set; }
     public bool Alerts { get; set; } = true;

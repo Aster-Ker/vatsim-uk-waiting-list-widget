@@ -719,7 +719,7 @@ sealed class WidgetForm : Form
         var startupItem = new ToolStripMenuItem("Start with Windows", null, (_, _) => SetStartWithWindows(!StartsWithWindows()));
 
         var sessionsMenu = new ToolStripMenuItem("Sessions");
-        var alertsItem = new ToolStripMenuItem("Session alerts (reminders, booking changes, feedback)", null, (_, _) =>
+        var alertsItem = new ToolStripMenuItem("Session alerts (reminders, bookings, feedback, exam results)", null, (_, _) =>
         {
             state.Sessions.Alerts = !state.Sessions.Alerts;
             state.Save();
@@ -738,6 +738,7 @@ sealed class WidgetForm : Form
         sessionsMenu.DropDownItems.Add(remindMenu);
         sessionsMenu.DropDownItems.Add(new ToolStripSeparator());
         sessionsMenu.DropDownItems.Add("Open My Training History", null, (_, _) => OpenUrl(SessionsService.HistoryUrl));
+        sessionsMenu.DropDownItems.Add("Open My Exams", null, (_, _) => OpenUrl(SessionsService.ExamsUrl));
         sessionsMenu.DropDownItems.Add("Open bookings calendar", null, (_, _) => OpenUrl("https://www.vatsim.uk/calendar"));
         menu.Opening += (_, _) =>
         {

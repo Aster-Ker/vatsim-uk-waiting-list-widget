@@ -14,6 +14,40 @@ static class SessionsService
 {
     const string DashboardUrl = "https://www.vatsim.uk/mship/manage/dashboard";
     public const string HistoryUrl = "https://www.vatsim.uk/training/my-training/mentoring-history";
+    public const string ExamsUrl = "https://www.vatsim.uk/training/my-training/exams";
+
+    // Reads the "Practical Exam History" and "Theory Exam History" tables on My Exams.
+    const string ExamsScript = """
+        (() => {
+          const exams = [];
+          let found = false;
+          for (const container of document.querySelectorAll('.fi-ta')) {
+            const heading = (container.querySelector('.fi-ta-header-heading')?.textContent || '').trim();
+            const type = /practical exam history/i.test(heading) ? 'Practical' : /theory exam history/i.test(heading) ? 'Theory' : null;
+            if (!type) continue;
+            found = true;
+            const table = container.querySelector('table.fi-ta-table') || container.querySelector('table');
+            if (!table) continue;
+            const headers = [...table.querySelectorAll('thead th')].map(th => th.textContent.trim().toLowerCase());
+            const col = name => headers.findIndex(h => h.startsWith(name));
+            const examCol = Math.max(0, headers.findIndex(h => h === 'exam'));
+            for (const row of table.querySelectorAll('tbody tr')) {
+              const cells = row.querySelectorAll('td');
+              if (cells.length < 3) continue;
+              const text = i => (i >= 0 && cells[i] ? cells[i].textContent.replace(/\s+/g, ' ').trim() : '');
+              const exam = text(examCol), result = text(col('result'));
+              if (!exam && !result) continue;
+              const link = row.querySelector('a[href*="/exams/report/"]');
+              exams.push({ type, exam, position: text(col('position')) || null, result,
+                score: text(col('score')) || null, date: text(col('exam date')), reportUrl: link ? link.href : null });
+            }
+          }
+          return { found: found || /Exam History/i.test(document.body.innerText), exams };
+        })()
+        """;
+
+    sealed record ExamRow(string Type, string Exam, string? Position, string Result, string? Score, string Date, string? ReportUrl);
+    sealed record ExamsPage(bool Found, List<ExamRow> Exams);
 
     const string FeedUrlScript = """
         (() => {
@@ -146,12 +180,52 @@ static class SessionsService
             message ??= historyPage.Message;
         }
 
+        // Exam results, from My Exams.
+        List<ExamRecord>? exams = null;
+        var examsPage = await browser.LoadAsync(new BrowserForm.PageJob(ExamsUrl,
+            uri => BrowserForm.IsVatsimUk(uri) && uri.AbsolutePath.StartsWith("/training", StringComparison.OrdinalIgnoreCase),
+            ExamsScript));
+        if (examsPage.Status == FetchStatus.LoginRequired)
+            return new Outcome(previous, new(), LoginRequired: true);
+        if (examsPage.HttpStatus is 403 or 404)
+        {
+            exams = new();
+        }
+        else if (examsPage.Status == FetchStatus.Ok)
+        {
+            var parsed = JsonSerializer.Deserialize<ExamsPage>(examsPage.Json ?? "null", new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (parsed is { Found: true })
+            {
+                exams = parsed.Exams.Select(e => new ExamRecord
+                {
+                    Id = e.ReportUrl != null ? "P" + e.ReportUrl.Split('/').Last() : $"{e.Type[0]}|{e.Exam}|{e.Position}|{e.Date}",
+                    Type = e.Type,
+                    Exam = e.Exam,
+                    Position = e.Position,
+                    Result = e.Result,
+                    Score = e.Score,
+                    Date = e.Date,
+                    ReportUrl = e.ReportUrl,
+                }).ToList();
+            }
+            else
+            {
+                message ??= "Couldn't read My Exams. The page layout may have changed.";
+            }
+        }
+        else
+        {
+            message ??= examsPage.Message;
+        }
+
         bool firstSync = previous.LastChecked == null;
         var notices = new List<Notice>();
         if (bookings != null && !firstSync)
             notices.AddRange(BookingChanges(previous.Bookings, bookings, now));
         if (history != null && !firstSync && previous.HistoryAvailable)
             notices.AddRange(ReportChanges(previous.History, history));
+        if (exams != null && previous.ExamsChecked != null)
+            notices.AddRange(ExamChanges(previous.Exams, exams));
 
         var state = new SessionsState
         {
@@ -159,6 +233,8 @@ static class SessionsService
             Bookings = bookings ?? previous.Bookings,
             History = history ?? previous.History,
             HistoryAvailable = historyAvailable,
+            Exams = exams ?? previous.Exams,
+            ExamsChecked = exams != null ? previous.ExamsChecked ?? now : previous.ExamsChecked,
             LastChecked = bookings != null || history != null ? now : previous.LastChecked,
             Message = message,
             Alerts = previous.Alerts,
@@ -195,6 +271,16 @@ static class SessionsService
             .Select(r => new Notice("Mentor feedback ready",
                 Join(Blank(r.Position), Blank(r.Date), Blank(r.Mentor) is string m ? "with " + m : null) + ". Click to read the report.",
                 r.ReportUrl));
+    }
+
+    static IEnumerable<Notice> ExamChanges(List<ExamRecord> old, List<ExamRecord> fresh)
+    {
+        var known = old.Select(e => e.Id).ToHashSet();
+        return fresh
+            .Where(e => !known.Contains(e.Id) && !string.IsNullOrWhiteSpace(e.Result))
+            .Select(e => new Notice($"Exam result: {e.Result}",
+                Join($"{e.Type} exam", Blank(e.Exam), e.Position, e.Score, Blank(e.Date)) + (e.ReportUrl != null ? ". Click to read the report." : ""),
+                e.ReportUrl));
     }
 
     static string? Blank(string s) => string.IsNullOrWhiteSpace(s) ? null : s;

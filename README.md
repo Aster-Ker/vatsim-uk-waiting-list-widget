@@ -48,7 +48,8 @@ personal calendar link on the vatsim.uk dashboard (under **Calendar subscription
   Click a session to open it on vatsim.uk.
 - A reminder pops up before each session with the alarm sound and stays on screen until you dismiss it.
   Right-click → **Sessions → Remind me before** sets how early: 10 minutes to 2 hours, default 30 minutes.
-- You're notified when a session is booked, moved or removed, and when your mentor files feedback. That's read from
+- You're notified when a session is booked, moved or removed, when your mentor files feedback, and when a new
+  exam result appears on **My Exams**. That's read from
   **My Training History** on vatsim.uk; clicking the notification opens the report.
 - Right-click → **Sessions** also turns these alerts off, and opens My Training History or the bookings calendar.
 
