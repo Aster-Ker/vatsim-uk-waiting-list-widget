@@ -14,7 +14,7 @@ android {
         applicationId = "io.github.asterker.waitinglist"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
+        versionCode = 15
         versionName = "1.5.0"
     }
 

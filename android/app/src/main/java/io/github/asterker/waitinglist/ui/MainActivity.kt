@@ -142,6 +142,10 @@ private fun App() {
             }
             widgetManager.requestPinAppWidget(ComponentName(context, provider), null, null)
         },
+        setJoinPosition = { key, position ->
+            Store.update { s -> s.copy(lists = s.lists.map { if (it.key == key) it.copy(joinPosition = position) else it }) }
+            WaitingListWidget.updateAll(context)
+        },
         signOut = {
             CookieManager.getInstance().removeAllCookies(null)
             CookieManager.getInstance().flush()

@@ -31,21 +31,29 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,6 +88,8 @@ class Actions(
     val setInterval: (Int) -> Unit,
     val pinWidget: (WidgetKind) -> Unit,
     val signOut: () -> Unit,
+    // Saves (or clears, with null) your position on the day you joined a list.
+    val setJoinPosition: (key: String, position: Int?) -> Unit,
 )
 
 enum class WidgetKind(val title: String, val description: String) {
@@ -225,6 +235,8 @@ private fun Header(title: String, state: AppState) {
 
 @Composable
 private fun WaitingListsPage(state: AppState, actions: Actions) {
+    // The list whose join position is being entered, if any.
+    var calibrating by remember { mutableStateOf<WaitingListEntry?>(null) }
     val c = LocalPanel.current
     if (state.status == Status.Error && !state.checking) {
         PanelAlert(c.destructive, "Couldn't check vatsim.uk", state.message ?: "Something went wrong.", "Retry", actions.checkNow)
@@ -242,8 +254,18 @@ private fun WaitingListsPage(state: AppState, actions: Actions) {
         }
         state.lists.forEachIndexed { i, entry ->
             if (i > 0) Divider()
-            ListRow(entry)
+            ListRow(entry) { calibrating = entry }
         }
+    }
+    calibrating?.let { entry ->
+        JoinPositionDialog(
+            entry,
+            onDismiss = { calibrating = null },
+            onSave = { position ->
+                actions.setJoinPosition(entry.key, position)
+                calibrating = null
+            },
+        )
     }
 
     Spacer(Modifier.height(12.dp))
@@ -388,10 +410,23 @@ private fun PanelSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, en
     )
 }
 
-// "About 3 months to #1 · moving ~4 places a month", or why there's no estimate yet.
+// "About 3 months to #1 · moving ~4 places a month", or why there's no estimate yet, then a
+// link to enter (or change) your position on the day you joined, which calibrates the estimate.
 @Composable
-private fun EstimateLine(entry: WaitingListEntry) {
+private fun EstimateLine(entry: WaitingListEntry, onCalibrate: () -> Unit) {
     val c = LocalPanel.current
+    val canCalibrate = entry.position != null && Estimate.joinedAt(entry.joined) != null
+    if (canCalibrate) {
+        val link = entry.joinPosition?.let { "Joined at #$it · Edit" } ?: "Add your position when you joined for a better estimate"
+        Spacer(Modifier.height(6.dp))
+        Text(
+            link,
+            color = if (entry.joinPosition == null) c.info.foreground else c.muted,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.clickable(onClick = onCalibrate),
+        )
+    }
     val (text, colour) = when (val estimate = Estimate.of(entry)) {
         null -> return
         Estimate.Next -> "You're next for a training place" to c.success.foreground
@@ -401,15 +436,84 @@ private fun EstimateLine(entry: WaitingListEntry) {
         is Estimate.Ready -> {
             val pace = estimate.placesPerMonth
             val paceText = if (pace >= 1.5) "moving ~${pace.roundToInt()} places a month" else "moving ~1 place a month"
-            "${Estimate.formatDays(estimate.days).replaceFirstChar { it.uppercase() }} to #1 · $paceText" to c.info.foreground
+            val basis = if (estimate.fromJoin) " since joining" else ""
+            "${Estimate.formatDays(estimate.days).replaceFirstChar { it.uppercase() }} to #1 · $paceText$basis" to c.info.foreground
         }
     }
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(if (canCalibrate) 2.dp else 6.dp))
     Text(text, color = colour, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 
+// Asks for your position on the day you joined; it must be at or behind where you are now.
 @Composable
-private fun ListRow(entry: WaitingListEntry) {
+private fun JoinPositionDialog(entry: WaitingListEntry, onDismiss: () -> Unit, onSave: (Int?) -> Unit) {
+    val c = LocalPanel.current
+    var text by remember { mutableStateOf(entry.joinPosition?.toString() ?: "") }
+    val value = text.toIntOrNull()
+    val current = entry.position
+    val error = when {
+        text.isEmpty() -> null
+        value == null || value < 1 -> "Enter a whole number, like 45"
+        current != null && value < current -> "That's ahead of where you are now (#$current)"
+        else -> null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.card,
+        titleContentColor = c.foreground,
+        textContentColor = c.muted,
+        title = { Text("Position when you joined", fontSize = 20.sp, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column {
+                Text(
+                    "What number were you on ${entry.name} when you joined on ${entry.joined}? " +
+                        "The estimate then measures your pace from that day, so it's ready straight away.",
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { new -> text = new.filter(Char::isDigit).take(5) },
+                    singleLine = true,
+                    prefix = { Text("#", color = c.muted) },
+                    placeholder = { Text("e.g. 45", color = c.muted) },
+                    isError = error != null,
+                    supportingText = if (error != null) {
+                        { Text(error, color = c.destructive.foreground) }
+                    } else {
+                        null
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = c.primary,
+                        unfocusedBorderColor = c.border,
+                        focusedTextColor = c.foreground,
+                        unfocusedTextColor = c.foreground,
+                        cursorColor = c.primary,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(value) }, enabled = value != null && error == null) {
+                Text("Save", color = if (value != null && error == null) c.foreground else c.muted, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            Row {
+                if (entry.joinPosition != null) {
+                    TextButton(onClick = { onSave(null) }) { Text("Clear", color = c.destructive.foreground) }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel", color = c.muted) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ListRow(entry: WaitingListEntry, onCalibrate: () -> Unit) {
     val c = LocalPanel.current
     val recent = entry.movedRecently()
     val highlight = if ((entry.change ?: 0) < 0) c.destructive else c.success
@@ -448,7 +552,7 @@ private fun ListRow(entry: WaitingListEntry) {
                         )
                     }
                 }
-                EstimateLine(entry)
+                EstimateLine(entry, onCalibrate)
             }
             Spacer(Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End) {

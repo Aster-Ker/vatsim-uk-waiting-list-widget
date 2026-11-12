@@ -5,8 +5,9 @@ import kotlin.math.roundToInt
 // Estimates how long until you reach #1 from how fast your own position has moved.
 // VATSIM UK doesn't publish list speeds, so this only knows what the app has seen.
 sealed interface Estimate {
-    // Days until #1 at the current pace, and the pace in places per month.
-    data class Ready(val days: Double, val placesPerMonth: Double) : Estimate
+    // Days until #1 at the current pace, and the pace in places per month. fromJoin means the
+    // pace was measured from the position you entered for the day you joined.
+    data class Ready(val days: Double, val placesPerMonth: Double, val fromJoin: Boolean = false) : Estimate
     data object Next : Estimate
     // Not enough movement seen yet; tracking began at `since`.
     data class Gathering(val since: Long) : Estimate
@@ -20,13 +21,18 @@ sealed interface Estimate {
         fun of(entry: WaitingListEntry, now: Long = System.currentTimeMillis()): Estimate? {
             val position = entry.position ?: return null
             if (position <= 1) return Next
-            val samples = entry.history.sortedBy { it.at }
+            // Your join position, if entered, counts as a sample on the day you joined.
+            val join = entry.joinPosition?.let { joinPosition ->
+                joinedAt(entry.joined)?.let { PositionSample(it, joinPosition) }
+            }
+            val samples = (entry.history + listOfNotNull(join)).sortedBy { it.at }
             val first = samples.firstOrNull() ?: return null
 
-            // Pace over the last six months, counting the quiet weeks since the last move.
+            // Pace over the last six months, counting the quiet weeks since the last move. The join
+            // position is the one known point before then, so from it the pace covers the whole wait.
             val windowStart = now - WINDOW_DAYS * DAY
             val baseline = samples.lastOrNull { it.at <= windowStart } ?: first
-            val from = maxOf(baseline.at, windowStart)
+            val from = if (baseline === join) baseline.at else maxOf(baseline.at, windowStart)
             val days = (now - from).toDouble() / DAY
             val moved = baseline.position - position
 
@@ -35,10 +41,15 @@ sealed interface Estimate {
                 moved <= 0 -> if (moved < 0 || days >= 60) Stalled else Gathering(first.at)
                 else -> {
                     val perDay = moved / days
-                    Ready((position - 1) / perDay, perDay * 30.44)
+                    Ready((position - 1) / perDay, perDay * 30.44, fromJoin = baseline === join)
                 }
             }
         }
+
+        // The join date as vatsim.uk shows it, e.g. "03 Feb 2026". English month names, as PHP prints them.
+        fun joinedAt(joined: String): Long? = runCatching {
+            java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.US).apply { isLenient = false }.parse(joined.trim())?.time
+        }.getOrNull()
 
         // Records the position whenever it changes, keeping a year of history.
         fun record(history: List<PositionSample>, position: Int?, now: Long): List<PositionSample> {

@@ -80,6 +80,7 @@ object Checker {
                 change = before.change,
                 changedAt = before.changedAt,
                 history = Estimate.record(before.history, entry.position, now),
+                joinPosition = before.joinPosition,
             )
             val was = before.position
             val current = entry.position

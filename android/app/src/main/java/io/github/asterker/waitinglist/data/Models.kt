@@ -13,6 +13,8 @@ data class WaitingListEntry(
     val changedAt: Long? = null,
     // Your position each time it changed, oldest first, for the time estimate.
     val history: List<PositionSample> = emptyList(),
+    // Your position on the day you joined, entered by you to calibrate the estimate.
+    val joinPosition: Int? = null,
 ) {
     val key: String get() = "$department|$name"
 

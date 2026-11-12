@@ -39,6 +39,7 @@ object Store {
                     theoryPassed = o.boolOrNull("theoryPassed"),
                     change = o.intOrNull("change"),
                     changedAt = o.longOrNull("changedAt"),
+                    joinPosition = o.intOrNull("joinPosition"),
                     history = o.optJSONArray("history")?.let { h ->
                         (0 until h.length()).map { j ->
                             val sample = h.getJSONObject(j)
@@ -73,6 +74,7 @@ object Store {
                 putOpt("theoryPassed", e.theoryPassed)
                 putOpt("change", e.change)
                 putOpt("changedAt", e.changedAt)
+                putOpt("joinPosition", e.joinPosition)
                 put("history", JSONArray().apply {
                     e.history.forEach { put(JSONObject().put("at", it.at).put("position", it.position)) }
                 })
