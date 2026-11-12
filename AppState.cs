@@ -20,6 +20,9 @@ sealed class WaitingListEntry
     // Your position each time it changed, oldest first, for the time estimate.
     public List<PositionSample> History { get; set; } = new();
 
+    // Your position on the day you joined, entered by you to calibrate the estimate.
+    public int? JoinPosition { get; set; }
+
     public string Key => $"{Department}|{Name}";
 }
 

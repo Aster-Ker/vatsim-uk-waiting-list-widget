@@ -261,6 +261,7 @@ sealed class WidgetForm : Form
             entry.Change = before.Change;
             entry.ChangedAt = before.ChangedAt;
             entry.History = before.History;
+            entry.JoinPosition = before.JoinPosition;
             Estimate.Record(entry, DateTime.UtcNow);
             if (before.Position is int was && entry.Position is int now && was != now)
             {
@@ -526,8 +527,8 @@ sealed class WidgetForm : Form
         {
             Estimate.Next => ("You're next for a training place", theme.Success.Foreground),
             Estimate.Stalled => ("No movement lately, so no estimate yet", theme.MutedForeground),
-            Estimate.Gathering e => ($"Estimate after a week or two of tracking (since {e.Since.ToLocalTime():d MMM})", theme.MutedForeground),
-            Estimate.Ready e => ($"{Capitalise(Estimate.FormatDays(e.Days))} to #1 · ~{Math.Max(1, Math.Round(e.PlacesPerMonth))} places a month", theme.Info.Foreground),
+            Estimate.Gathering => ("Estimate soon, or right-click → Position when I joined", theme.MutedForeground),
+            Estimate.Ready e => ($"{Capitalise(Estimate.FormatDays(e.Days))} to #1 · ~{Math.Max(1, Math.Round(e.PlacesPerMonth))} places a month{(e.FromJoin ? " since joining" : "")}", theme.Info.Foreground),
             _ => (null, theme.MutedForeground),
         };
         if (estimate.text != null)
@@ -716,6 +717,23 @@ sealed class WidgetForm : Form
             Notifier.Show(tray, "Waiting list update (test)", body);
         });
 
+        // Position when you joined each list, to calibrate its estimate. Rebuilt each time the menu opens.
+        var joinMenu = new ToolStripMenuItem("Position when I joined");
+        joinMenu.DropDownItems.Add("(no lists yet)");
+        menu.Opening += (_, _) =>
+        {
+            joinMenu.DropDownItems.Clear();
+            foreach (var list in state.Lists.Where(l => l.Position != null && Estimate.JoinedAt(l.Joined) != null))
+            {
+                var entry = list;
+                string current = entry.JoinPosition is int p ? $" (#{p})" : "";
+                joinMenu.DropDownItems.Add($"{entry.Name}{current}…", null, (_, _) => AskJoinPosition(entry));
+            }
+            if (joinMenu.DropDownItems.Count == 0)
+                joinMenu.DropDownItems.Add(new ToolStripMenuItem("(no lists yet)") { Enabled = false });
+            SetMenuColors(joinMenu.DropDownItems);
+        };
+
         var startupItem = new ToolStripMenuItem("Start with Windows", null, (_, _) => SetStartWithWindows(!StartsWithWindows()));
 
         var sessionsMenu = new ToolStripMenuItem("Sessions");
@@ -747,7 +765,7 @@ sealed class WidgetForm : Form
                 item.Checked = (int)item.Tag! == state.Sessions.RemindMinutes;
         };
 
-        menu.Items.AddRange(new ToolStripItem[] { showItem, topItem, themeMenu, intervalMenu, notifyMenu, sessionsMenu, startupItem, new ToolStripSeparator() });
+        menu.Items.AddRange(new ToolStripItem[] { showItem, topItem, themeMenu, intervalMenu, notifyMenu, sessionsMenu, joinMenu, startupItem, new ToolStripSeparator() });
         menu.Items.Add("Sign out", null, (_, _) =>
         {
             browser.SignOut();
@@ -766,6 +784,55 @@ sealed class WidgetForm : Form
             foreach (ToolStripMenuItem item in themeMenu.DropDownItems)
                 item.Checked = (ThemeMode)item.Tag! == state.Theme;
         };
+    }
+
+    // Asks for your position on the day you joined; it must be at or behind where you are now.
+    void AskJoinPosition(WaitingListEntry entry)
+    {
+        using var dialog = new Form
+        {
+            Text = "Position when you joined",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterScreen,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            TopMost = true,
+            AutoScaleMode = AutoScaleMode.Dpi,
+            ClientSize = new Size(380, 170),
+            BackColor = theme.Card,
+            ForeColor = theme.Foreground,
+            Font = Theme.Font(9.5f),
+        };
+        var prompt = new Label
+        {
+            Text = $"What number were you on {entry.Name} when you joined on {entry.Joined}? " +
+                   "The estimate then measures your pace from that day.",
+            Location = new Point(16, 14),
+            Size = new Size(348, 56),
+        };
+        var number = new NumericUpDown
+        {
+            Minimum = Math.Max(1, entry.Position ?? 1),
+            Maximum = 99999,
+            Value = Math.Max(Math.Max(1, entry.Position ?? 1), entry.JoinPosition ?? entry.Position ?? 1),
+            Location = new Point(16, 78),
+            Width = 120,
+        };
+        var save = new Button { Text = "Save", DialogResult = DialogResult.OK, Location = new Point(124, 124), Width = 76 };
+        var clear = new Button { Text = "Clear", DialogResult = DialogResult.Abort, Location = new Point(206, 124), Width = 76, Enabled = entry.JoinPosition != null };
+        var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(288, 124), Width = 76 };
+        dialog.Controls.AddRange(new Control[] { prompt, number, save, clear, cancel });
+        dialog.AcceptButton = save;
+        dialog.CancelButton = cancel;
+        dialog.HandleCreated += (_, _) => Theme.SetDarkTitleBar(dialog.Handle, theme.IsDark);
+
+        var answer = dialog.ShowDialog(this);
+        if (answer == DialogResult.Cancel)
+            return;
+        entry.JoinPosition = answer == DialogResult.OK ? (int)number.Value : null;
+        state.Save();
+        Invalidate();
     }
 
     static string FormatInterval(int minutes) => minutes < 60 ? $"{minutes} min" : minutes == 60 ? "1 hour" : $"{minutes / 60} hours";

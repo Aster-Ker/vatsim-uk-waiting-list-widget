@@ -39,6 +39,10 @@ records your position each time it changes and works out your pace over the last
 movement. For example: "About 3 months to #1 · ~4 places a month". It needs about a week of tracking with some
 movement before the first estimate appears, and it's only a guide: lists can speed up or slow down.
 
+**Calibrate with your join position.** If you know what number you were on the day you joined a list, enter it and
+the estimate measures your pace from your join date instead, so it's ready straight away. For example, joined on
+3 Feb at #45 and now #11 is 34 places in about 9 months. On Windows: right-click → **Position when I joined**.
+
 ## Sessions
 
 The widget also shows your next three bookings from vatsim.uk: ATC bookings, mentoring sessions and exams. It finds your
