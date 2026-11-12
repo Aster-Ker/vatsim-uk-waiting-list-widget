@@ -7,7 +7,18 @@ Track your VATSIM UK training sessions, mentor feedback and waiting list positio
 | **Android** app and home screen widgets | `UKWaitingLists.apk` | Android 8.0 or later |
 | **Windows** desktop widget | `WaitingListWidget-win-x64.zip` | Windows 10 (1809+) or 11, 64-bit |
 
-## New in v1.4.0
+## New in v1.5.0
+
+- **Practical exam history** on Android: the Sessions page's Past tab lists your practical exams with their result
+  (Passed, Partial Pass, Failed…) and date.
+- **Exam reports in the Android app:** practical exam reports open in the app's own layout, with the result,
+  examiners, the examiner's comments and each criterion's grade (Fully Competent to Fail) with notes.
+- **Exam result alerts** on Android and Windows when a new practical exam result appears.
+- **Calibrate the estimate with your join position:** enter the number you were on when you joined a list and the
+  time-to-#1 estimate measures your pace from your join date, so it's ready straight away. On Android tap **Add your
+  position when you joined** under a list; on Windows right-click → **Position when I joined**.
+
+## From v1.4.0
 
 - **Estimated time to #1** for each waiting list, on Android and Windows. The apps record your position each time it
   changes and work out your pace over the last six months, e.g. "About 4 months to #1 · moving ~3 places a month".
